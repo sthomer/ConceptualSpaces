@@ -30,32 +30,31 @@ object Wave extends App {
     sample = sampleSigned / fullScale
   } yield sample).toArray
 
-//  val samplesPadded = NdArray.padTo(samplesIn, 64*1024)
   // Transformation
-  val size = samplesIn.length // Best sound at powers of 2 due to padding
+  val size = 512// samplesIn.length // Best sound at powers of 2 due to padding
   val space = new EuclidianSpace
-  val segments = samplesIn.grouped(size).toList
-  val times = segments.map(s => Trajectory.fromTensor(Tensor.from(s)))
-  val frequencies = Trajectory.fromConcepts(times.map(space.transform).toArray)
-  val quefrency = space.transform(frequencies)
-  val frencyque = space.inverse(quefrency)
-  val inverses = frequencies.concepts.map(space.inverse)
-//  val samplesTrans = (Vector[Any]() /: inverses.map(_.tensor.toRealArray)) (_ ++ _)
+  val times = samplesIn
+    .map(r => Concept(r))
+    .grouped(size)
+    .map(a => Trajectory(a.toVector))
+    .toVector
+  val frequencies = Trajectory(times.map(space.transform))
+  val frequencies2 = space.transform(frequencies)
+  val inverses2 = space.inverse(frequencies2)
+  val inverses = inverses2.concepts.map(space.inverse)
+  val outs = inverses
+    .flatMap(t => t.concepts)
+    .map(c => c.tensor)
+    .map({case c: Complex => c.getReal})
+  val samplesTrans = outs.toArray
 
   val ratio = 1//samplesTrans.length.toFloat / samplesIn.length
-
-  val time = Trajectory.fromTensor(Tensor.from(samplesIn))
-  val freq = space.transform(time)
-  val freq2 = space.transform(Trajectory.fromTensor(freq.tensor))
-  val inv2 = space.inverse(freq2)
-  val inv = space.inverse(Concept(inv2.tensor))
-  val samplesTrans = inv.tensor.toRealArray
 
 
   // Encode
   val samplesOut = (for {
-    sample <- samplesTrans.toArray
-    long = (sample.asInstanceOf[Double] * fullScale).toLong // signed
+    sample <- samplesTrans
+    long = (sample * fullScale).toLong // signed
     bytes = for (i <- 0 until sampleSize)
       yield ((long >>> i * 8) & 0xffL).toByte // little-endian
   } yield bytes).flatten
