@@ -31,7 +31,7 @@ object Wave extends App {
   } yield sample).toArray
 
   // Transformation
-  val size = 512// samplesIn.length // Best sound at powers of 2 due to padding
+  val size = 400 // samplesIn.length // Best sound at powers of 2 due to padding
   val space = new EuclidianSpace
   val times = samplesIn
     .map(r => Concept(r))
@@ -48,7 +48,9 @@ object Wave extends App {
     .map({case c: Complex => c.getReal})
   val samplesTrans = outs.toArray
 
-  val ratio = 1//samplesTrans.length.toFloat / samplesIn.length
+  val d = space.distance(frequencies2, frequencies2)
+
+  val ratio = samplesTrans.length.toFloat / samplesIn.length
 
 
   // Encode
