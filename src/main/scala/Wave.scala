@@ -1,10 +1,13 @@
 import space._
-import space.Implicits._
+import Implicits._
+
 import java.io._
 import javax.sound.sampled._
 
 object Wave extends App {
 
+  // Concatenate all WAVs in dir and subdirs with:
+  //  sox $(find -iname '*.WAV') ~/Download/out.wav
   // Read file
   //val file = new File("src/main/TIMIT/TRAIN/DR1/FCJF0/SA1.WAV")
   val file = new File("src/main/scala/export.wav") // PCM Signed 16-bit
@@ -27,36 +30,45 @@ object Wave extends App {
     sampleRaw = group reduce ((less, more) =>
       (less & 0xffL) | ((more & 0xffL) << 8)) // little-endian
     sampleSigned = (sampleRaw << bitsToExtend) >> bitsToExtend // signed
-    sample = sampleSigned / fullScale
+    sample = sampleSigned.toDouble // / fullScale
   } yield sample).toArray
 
   // Transformation
-  val size = 400 // samplesIn.length // Best sound at powers of 2 due to padding
-  val space = new EuclidianSpace
-  val times = samplesIn
+  val size = 8 // samplesIn.length
+  val space = new FastEuclidianSpace
+
+  val timeSpace = new FastEuclidianSpace
+  val timeConcepts = samplesIn
     .map(r => Concept(r))
-    .grouped(size)
-    .map(a => Trajectory(a.toVector))
     .toVector
-  val frequencies = Trajectory(times.map(space.transform))
+  timeSpace.concepts = timeConcepts
+  val timeTrajectories = timeSpace.concepts
+    .grouped(size)
+    .map(a => Trajectory(a))
+    .toVector
+  timeSpace.trajectories = timeTrajectories
+
+  val frequencies = Trajectory(timeSpace.trajectories.map(space.transform))
+  val dis = frequencies.concepts.distinct
   val frequencies2 = space.transform(frequencies)
   val inverses2 = space.inverse(frequencies2)
-  val inverses = inverses2.concepts.map(space.inverse)
+  val inverses = frequencies.concepts.map(space.inverse)
   val outs = inverses
     .flatMap(t => t.concepts)
     .map(c => c.tensor)
     .map({case c: Complex => c.getReal})
   val samplesTrans = outs.toArray
 
-  val d = space.distance(frequencies2, frequencies2)
+//  val distance = space.distance(frequencies.concepts(0), frequencies.concepts(1))
 
-  val ratio = samplesTrans.length.toFloat / samplesIn.length
+  val ratio = 1 //samplesTrans.length.toFloat / samplesIn.length
 
 
   // Encode
   val samplesOut = (for {
     sample <- samplesTrans
-    long = (sample * fullScale).toLong // signed
+    long = scala.math.round(sample) // Double->Long
+//    long = (sample * fullScale).toLong // signed
     bytes = for (i <- 0 until sampleSize)
       yield ((long >>> i * 8) & 0xffL).toByte // little-endian
   } yield bytes).flatten
