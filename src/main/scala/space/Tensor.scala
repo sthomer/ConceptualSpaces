@@ -22,7 +22,12 @@ object Complex {
 
   def sqrt(c: Complex): Complex = c match {
     case Complex.empty => c
-    case _ => c.pow(0.5) //
+    case _ => c.pow(0.5)
+  }
+
+  def conjugate(c: Complex): Complex = c match {
+    case Complex.empty => c
+    case _ => c.pow(0.5)
   }
 
   def exp(c: Complex): Complex = Math.E.pow(c)
@@ -34,6 +39,8 @@ object Complex {
 }
 
 object Tensor {
+  val r = new scala.util.Random // nextDouble or nextGaussian?
+
   def ofShape(shape: Int*): Tensor = {
     def make(shape: Seq[Int]): TensorLike = shape.toList match {
       case Nil => Complex.empty
@@ -43,7 +50,65 @@ object Tensor {
     make(shape).asInstanceOf[Tensor]
   }
 
+  def sqrt(t: TensorLike): TensorLike = t match {
+    case c: Complex => c.sqrt
+    case t: Tensor => Tensor(t.ts.map(sqrt))
+  }
+
+  def conjugate(t: TensorLike): TensorLike = t match {
+    case c: Complex => c.conjugate
+    case t: Tensor => Tensor(t.ts.map(conjugate))
+  }
+
+  def random(min: TensorLike, max: TensorLike): TensorLike = {
+    def make(min: TensorLike, max: TensorLike): TensorLike = (min, max) match {
+      case (min: Complex, max: Complex) => Complex(
+        r.nextDouble * (max.re - min.re) + min.re, // or (r.nextGaussian + 0.5)
+        r.nextDouble * (max.im - min.im) + min.im) // or (r.nextGaussian + 0.5)
+      case (min: Tensor, max: Tensor) =>
+        Tensor(min.ts.zip(max.ts).map({ case (min, max) => make(min, max) }))
+    }
+    make(min, max)
+  }
+
+
   def from(a: Array[Double]) = Tensor(a.toVector.map(Complex(_, 0)))
+
+  def min(a: TensorLike, b: TensorLike): TensorLike = {
+    def minRe(a: TensorLike, b: TensorLike): TensorLike = (a, b) match {
+      case (a: Complex, b: Complex) =>
+        Complex(math.min(a.re, b.re), 0)
+      case (a: Tensor, b: Tensor) =>
+        Tensor(a.ts.zip(b.ts).map({ case (a, b) => minRe(a, b) }))
+    }
+
+    def minIm(a: TensorLike, b: TensorLike): TensorLike = (a, b) match {
+      case (a: Complex, b: Complex) =>
+        Complex(0, math.max(a.im, b.im))
+      case (a: Tensor, b: Tensor) =>
+        Tensor(a.ts.zip(b.ts).map({ case (a, b) => minIm(a, b) }))
+    }
+
+    minRe(a, b) + minIm(a, b)
+  }
+
+  def max(a: TensorLike, b: TensorLike): TensorLike = {
+    def maxRe(a: TensorLike, b: TensorLike): TensorLike = (a, b) match {
+      case (a: Complex, b: Complex) =>
+        Complex(math.max(a.re, b.re), 0)
+      case (a: Tensor, b: Tensor) =>
+        Tensor(a.ts.zip(b.ts).map({ case (a, b) => maxRe(a, b) }))
+    }
+
+    def maxIm(a: TensorLike, b: TensorLike): TensorLike = (a, b) match {
+      case (a: Complex, b: Complex) =>
+        Complex(0, math.max(a.im, b.im))
+      case (a: Tensor, b: Tensor) =>
+        Tensor(a.ts.zip(b.ts).map({ case (a, b) => maxIm(a, b) }))
+    }
+
+    maxRe(a, b) + maxIm(a, b)
+  }
 }
 
 sealed trait TensorLike extends Immutable {
@@ -150,6 +215,7 @@ case class Tensor(ts: Vector[TensorLike] = Vector()) extends TensorLike {
         case c: Complex => Complex(round(c.re).toDouble, round(c.im).toDouble)
         case t: Tensor => rounded(t)
       }))
+
     rounded(this).asInstanceOf[Tensor]
   }
 
@@ -178,6 +244,24 @@ case class Tensor(ts: Vector[TensorLike] = Vector()) extends TensorLike {
 
   def odds: Tensor =
     Tensor(ts.grouped(2).map(t => t.last).toVector)
+
+  // Abstract these to a map (maybe also make a reduce?)
+
+  def sqrt: TensorLike = {
+    def sqrt(t: TensorLike): TensorLike = t match {
+      case c: Complex => c.sqrt
+      case t: Tensor => Tensor(t.ts.map(sqrt))
+    }
+    sqrt(this)
+  }
+
+  def conjugate: TensorLike = {
+    def conjugate(t: TensorLike): TensorLike = t match {
+      case c: Complex => c.conjugate
+      case t: Tensor => Tensor(t.ts.map(conjugate))
+    }
+    conjugate(this)
+  }
 
   // Frobenius Operations
 
