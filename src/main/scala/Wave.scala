@@ -60,11 +60,9 @@ object Wave extends App {
   val dis = catSpace.concepts.distinct
   println("# Original: " + freqSpace.concepts.length)
   println("# Categories: " + dis.length)
-//  val fsquant = freqSpace.quantize
-//  val dis = fsquant.distinct.length
   val frequencies = Trajectory(catSpace.concepts)
-  val frequencies2 = space.transform(frequencies)
-  val inverses2 = space.inverse(frequencies2)
+//  val frequencies2 = space.transform(frequencies)
+//  val inverses2 = space.inverse(frequencies2)
 
   println("Inverting...")
   val inverses = frequencies.concepts.map(space.inverse)

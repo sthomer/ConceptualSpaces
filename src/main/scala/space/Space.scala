@@ -43,7 +43,13 @@ trait Gaussian extends Categorization {
   var clumps: Vector[Set[Concept]] = Vector()
   var M: TensorLike = 0 // placeholder
   var S: TensorLike = 0 // placeholder
-  def s: TensorLike = Tensor.sqrt(S / (concepts.length - 1))
+  def V: TensorLike = S / (concepts.length - 1)
+  def sd: TensorLike = Tensor.sqrt(V) * 1.5
+
+  // Standard deviation in normal space (not lognormal space)
+//  def lnM: TensorLike = Tensor.exp(0.5 * V + M)
+//  def lnV: TensorLike = lnM * lnM * (Tensor.exp(V) - 1)
+//  def lnSd: TensorLike = Tensor.sqrt(lnV)
 
   def seed(concept: Concept): Unit = {
     concepts = concepts :+ concept
@@ -56,16 +62,21 @@ trait Gaussian extends Categorization {
   // The Art of Programming - Knuth Vol. 2 pg. 232 3rd ed.
   def clump(target: Concept): Set[Concept] = {
     val x = target.tensor
-    val Mk = M + (x - M) / concepts.length
-    val Sk = S + (x - M) * (x - Mk)
-    M = Mk
-    S = Sk
+    if (x finite) { // denominator is slightly too big
+      val Mk = M + ((x - M) / concepts.length)
+      val Sk = S + ((x - M) * (x - Mk))
+      M = Mk
+      S = Sk
+    }
 
-    // Bottleneck!
-    concepts.filter(c =>
-      distance(c, target) < distance(c, Concept(c.tensor + s))).toSet
-    // alternatively, compare to centers instead of concepts
-    // i.e. check proximity in alpha+1 instead of alpha
+    clumps.filter(cl => cl.exists(c => {
+//      val s = sd
+//      val targetDistance = distance(c, target)
+//      val radiusDistance = distance(c, Concept(c.tensor + sd))
+//      val d = targetDistance - radiusDistance
+//      d < 0
+      distance(c, target) < distance(c, Concept(c.tensor + sd))
+    })).flatten.toSet + target
   }
 
   def feed(concept: Concept): Unit = {
@@ -89,7 +100,7 @@ trait Gaussian extends Categorization {
   def categorize: Vector[Concept] = {
     val centers = clumps.map(cl => cl -> center(cl)).toMap
     concepts.flatMap(c => clumps.find(cl => cl(c)))
-      .map(cl => centers(cl)) // centers can be calculated beforehand
+      .map(cl => centers(cl))
   }
 }
 
@@ -176,7 +187,7 @@ class EuclidianSpace extends Space
 }
 
 class FastEuclidianSpace extends Space
-  with Euclidian with FastFourierTransform with Gaussian {
+  with Euclidian with LogFastFourierTransform with Gaussian {
   var concepts: Vector[Concept] = Vector.empty
   var trajectories: Vector[Trajectory] = Vector.empty
 }
@@ -236,11 +247,11 @@ trait FastFourierTransform extends Transform {
     }
   }
 
-  def fft(t: TensorLike, dir: Direction.Direction): Tensor = {
+  def fft(t: Tensor, dir: Direction.Direction): TensorLike = {
     import Direction._
 
-    def _fft(t: TensorLike): TensorLike = t match {
-      case c if t.length == 1 => c
+    def _fft(t: Tensor): Tensor = t match {
+      case base if t.length == 1 => base
       case t: Tensor =>
         val n = t.length
         (_fft(t.evens), _fft(t.odds)) match {
@@ -256,10 +267,58 @@ trait FastFourierTransform extends Transform {
       case _: Inverse => Complex.exp(2 * Math.PI * m.i / n)
     }).asInstanceOf[Complex]
 
-    (_fft(t) * (dir match {
-      case _: Forward => 1.0
-      case _: Inverse => 1.0 / t.length
-    })).asInstanceOf[Tensor]
+    val done = _fft(t)
+    dir match {
+      case _: Forward => done
+      case _: Inverse => (1.0 / t.length) * done
+    }
+  }
+}
+
+trait LogFastFourierTransform extends Transform {
+
+  def transform(trajectory: Trajectory): Concept =
+    Concept(fft(trajectory.tensor.pad, Direction.Forward))
+
+  def inverse(concept: Concept): Trajectory = concept.tensor match {
+    case tensor: Tensor => fft(tensor, Direction.Inverse) match {
+      case tensor: Tensor => Trajectory(tensor.ts.map(c => Concept(c)))
+    }
+  }
+
+  def fft(t: Tensor, dir: Direction.Direction): TensorLike = {
+    import Direction._
+
+    def _fft(t: Tensor): Tensor = t match {
+      case base if t.length == 1 => // base
+        // Natural log transform
+        dir match {
+          case _: Forward => base
+          case _: Inverse => base match {
+            case Tensor(Vector(c: Complex)) => Tensor(Vector(c.exp))
+            case Tensor(Vector(t: Tensor)) => Tensor(Vector(t.exp))
+          }
+      }
+      case t: Tensor =>
+        val n = t.length
+        (_fft(t.evens), _fft(t.odds)) match {
+          case (evens: Tensor, odds: Tensor) =>
+            val c1 = (0 until n / 2) map (m => evens(m) + odds(m) * omega(n, m))
+            val c2 = (0 until n / 2) map (m => evens(m) - odds(m) * omega(n, m))
+            Tensor((c1 ++ c2).toVector)
+        }
+    }
+
+    def omega(n: Int, m: Int): Complex = (dir match {
+      case _: Forward => Complex.exp(-2 * Math.PI * m.i / n)
+      case _: Inverse => Complex.exp(2 * Math.PI * m.i / n)
+    }).asInstanceOf[Complex]
+
+    val done = _fft(t)
+    dir match {
+      case _: Forward => done.log
+      case _: Inverse => (1.0 / t.length) * done
+    }
   }
 }
 

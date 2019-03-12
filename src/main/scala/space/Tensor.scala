@@ -60,6 +60,16 @@ object Tensor {
     case t: Tensor => Tensor(t.ts.map(conjugate))
   }
 
+  def log(t: TensorLike): TensorLike = t match {
+    case c: Complex => c.log
+    case t: Tensor => Tensor(t.ts.map(log))
+  }
+
+  def exp(t: TensorLike): TensorLike = t match {
+    case c: Complex => c.exp
+    case t: Tensor => Tensor(t.ts.map(exp))
+  }
+
   def random(min: TensorLike, max: TensorLike): TensorLike = {
     def make(min: TensorLike, max: TensorLike): TensorLike = (min, max) match {
       case (min: Complex, max: Complex) => Complex(
@@ -130,6 +140,8 @@ sealed trait TensorLike extends Immutable {
   def pad: TensorLike = this
 
   def padTo(max: Int): TensorLike = this
+
+  def finite: Boolean
 }
 
 case class Complex(re: Double = 0, im: Double = 0)
@@ -145,6 +157,8 @@ case class Complex(re: Double = 0, im: Double = 0)
 
   val magnitude =
     Math.sqrt(Math.pow(Math.abs(re), 2) + Math.pow(Math.abs(im), 2))
+
+  def finite = !(this.isNaN || this.isInfinite)
 
   // Scala Operations
 
@@ -247,6 +261,14 @@ case class Tensor(ts: Vector[TensorLike] = Vector()) extends TensorLike {
 
   // Abstract these to a map (maybe also make a reduce?)
 
+  def finite: Boolean = {
+    def finite(t: TensorLike): Boolean = t match {
+      case c: Complex => c.finite
+      case t: Tensor => t.ts.forall(finite)
+    }
+    finite(this)
+  }
+
   def sqrt: TensorLike = {
     def sqrt(t: TensorLike): TensorLike = t match {
       case c: Complex => c.sqrt
@@ -261,6 +283,22 @@ case class Tensor(ts: Vector[TensorLike] = Vector()) extends TensorLike {
       case t: Tensor => Tensor(t.ts.map(conjugate))
     }
     conjugate(this)
+  }
+
+  def log: TensorLike = {
+    def log(t: TensorLike): TensorLike = t match {
+      case c: Complex => c.log // Complex.log(c)
+      case t: Tensor => Tensor(t.ts.map(log))
+    }
+    log(this)
+  }
+
+  def exp: TensorLike = {
+    def exp(t: TensorLike): TensorLike = t match {
+      case c: Complex => c.exp
+      case t: Tensor => Tensor(t.ts.map(exp))
+    }
+    exp(this)
   }
 
   // Frobenius Operations
