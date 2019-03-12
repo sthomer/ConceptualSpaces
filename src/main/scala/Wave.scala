@@ -6,10 +6,10 @@ import javax.sound.sampled._
 
 object Wave extends App {
 
-  // Concatenate all WAVs in dir and subdirs with:
-  //  sox $(find -iname '*.WAV') ~/Download/out.wav
   // Read file
-  //val file = new File("src/main/TIMIT/TRAIN/DR1/FCJF0/SA1.WAV")
+  println("Loading wav...")
+  // Concatenate all WAVs in dir and subdirs with:
+  //  sox $(find -iname '*.WAV') ~/Downloads/out.wav
   val file = new File("src/main/scala/export.wav") // PCM Signed 16-bit
   val audioIn = AudioSystem.getAudioInputStream(file)
   val audioLength = audioIn.getFrameLength * audioIn.getFormat.getFrameSize
@@ -34,35 +34,39 @@ object Wave extends App {
   } yield sample).toArray
 
   // Transformation
-  val size = 256 // samplesIn.length
+  println("Transforming...")
+  val size = 512 // samplesIn.length
   val space = new FastEuclidianSpace
-
   val timeSpace = new FastEuclidianSpace
   val timeConcepts = samplesIn
     .map(r => Concept(r))
     .toVector
   timeSpace.concepts = timeConcepts
-
   val timeTrajectories = timeSpace.concepts
     .grouped(size)
     .map(a => Trajectory(a))
     .toVector
   timeSpace.trajectories = timeTrajectories
-
   val freqSpace = new FastEuclidianSpace
-  val freqConcepts = timeSpace.trajectories.map(space.transform)
+  var freqConcepts = timeSpace.trajectories.map(space.transform)
   // Last one will (always) be shorter, so pad it
-  freqSpace.concepts = freqConcepts.init :+
+  freqConcepts = freqConcepts.init :+
     Concept(freqConcepts.last.tensor.padTo(freqConcepts.head.tensor.length))
 
-  val fsquant = freqSpace.quantize
-  val dis = fsquant.distinct.length
-  println("Categories: " + dis)
-  println("Compression: " + (dis.toFloat / fsquant.length))
+  println("Categorizing...")
+  freqSpace.fill(freqConcepts)
+  val catSpace = new FastEuclidianSpace
+  catSpace.concepts = freqSpace.categorize
+  val dis = catSpace.concepts.distinct
+  println("# Original: " + freqSpace.concepts.length)
+  println("# Categories: " + dis.length)
+//  val fsquant = freqSpace.quantize
+//  val dis = fsquant.distinct.length
+  val frequencies = Trajectory(catSpace.concepts)
+  val frequencies2 = space.transform(frequencies)
+  val inverses2 = space.inverse(frequencies2)
 
-  val frequencies = Trajectory(fsquant)
-//  val frequencies2 = space.transform(frequencies)
-//  val inverses2 = space.inverse(frequencies2)
+  println("Inverting...")
   val inverses = frequencies.concepts.map(space.inverse)
   val outConcepts = inverses.flatMap(t => t.concepts)
   val outs = outConcepts
@@ -70,11 +74,9 @@ object Wave extends App {
     .map({case c: Complex => c.getReal})
   val samplesTrans = outs.toArray
 
-  val ratio = 1 // samplesTrans.length.toFloat / samplesIn.length
-
-
-
   // Encode
+  println("Playing...")
+  val ratio = 1 // samplesTrans.length.toFloat / samplesIn.length
   val samplesOut = (for {
     sample <- samplesTrans
 //    long = scala.math.round(sample) // Double->Long

@@ -25,12 +25,75 @@ trait Transform extends Space with InnerProduct {
 }
 
 trait Categorization extends Space with InnerProduct {
-  def quantize: Vector[Concept]
+  //  def quantize: Vector[Concept]
 }
 
+trait Gaussian extends Categorization {
+
+  // 1) Within radius of another category
+  // 2) Decrease in mean information content
+  //    -> post-transform, this is nearly always the case
+  //    => don't worry about it...
+
+  // Potentially useful data structures:
+  // Map from target to cluster
+  // Map from cluster to center
+  // Map from target to center??
+
+  var clumps: Vector[Set[Concept]] = Vector()
+  var M: TensorLike = 0 // placeholder
+  var S: TensorLike = 0 // placeholder
+  def s: TensorLike = Tensor.sqrt(S / (concepts.length - 1))
+
+  def seed(concept: Concept): Unit = {
+    concepts = concepts :+ concept
+    clumps = clumps :+ Set[Concept](concept)
+    M = concept.tensor
+    S = 0
+  }
+
+  // Running Mean and Variance
+  // The Art of Programming - Knuth Vol. 2 pg. 232 3rd ed.
+  def clump(target: Concept): Set[Concept] = {
+    val x = target.tensor
+    val Mk = M + (x - M) / concepts.length
+    val Sk = S + (x - M) * (x - Mk)
+    M = Mk
+    S = Sk
+
+    // Bottleneck!
+    concepts.filter(c =>
+      distance(c, target) < distance(c, Concept(c.tensor + s))).toSet
+    // alternatively, compare to centers instead of concepts
+    // i.e. check proximity in alpha+1 instead of alpha
+  }
+
+  def feed(concept: Concept): Unit = {
+    concepts = concepts :+ concept
+    val cl = clump(concept)
+    clumps = (clumps :+ cl).map(c =>
+      if ((c & cl) != Set.empty) c | cl else c).distinct
+  }
+
+  def fill(concepts: Vector[Concept]): Unit = {
+    seed(concepts.head)
+    concepts.tail foreach feed
+  }
+
+  def center(members: Set[Concept]): Concept =
+    Concept(members
+      .map(c => c.tensor)
+      .reduce[TensorLike]((acc, t) => acc + t)
+      / members.size)
+
+  def categorize: Vector[Concept] = {
+    val centers = clumps.map(cl => cl -> center(cl)).toMap
+    concepts.flatMap(c => clumps.find(cl => cl(c)))
+      .map(cl => centers(cl)) // centers can be calculated beforehand
+  }
+}
 
 trait Kmeans extends Categorization {
-
 
   def min: Concept = // lazy val?
     Concept(concepts.map(c => c.tensor)
@@ -47,9 +110,9 @@ trait Kmeans extends Categorization {
   def stddev(mean: Concept): Concept =
     Concept(Tensor.sqrt(concepts.map(c => c.tensor)
       .reduce[TensorLike]((acc, t) => {
-        val diff = t - mean.tensor
-        acc + (diff * diff)
-      }) / concepts.length))
+      val diff = t - mean.tensor
+      acc + (diff * diff)
+    }) / concepts.length))
 
   def random(min: Concept, max: Concept): Concept = // lazy val?
     Concept(Tensor.random(min.tensor, max.tensor))
@@ -71,8 +134,8 @@ trait Kmeans extends Categorization {
 
   def quantize: Vector[Concept] = {
     var count = 1
-//    val allMinC = min
-//    val allMaxC = max
+    //    val allMinC = min
+    //    val allMaxC = max
     val meanC = mean
     val stddevC = stddev(mean)
     val minC = Concept(Tensor.sqrt(meanC.tensor - stddevC.tensor))
@@ -86,7 +149,7 @@ trait Kmeans extends Categorization {
       if (count == 10 || c == centers) p else update(c) // 10 = sweet spot
     }
 
-    val map = update(initial).flatMap({ case (c, ms) => ms.map(m => m -> c)})
+    val map = update(initial).flatMap({ case (c, ms) => ms.map(m => m -> c) })
     concepts.map(c => map(c))
   }
 }
@@ -107,13 +170,13 @@ trait Manhattan extends InnerProduct {
 }
 
 class EuclidianSpace extends Space
-  with Euclidian with FourierTransform with Kmeans {
+  with Euclidian with FourierTransform with Gaussian {
   var concepts: Vector[Concept] = Vector.empty
   var trajectories: Vector[Trajectory] = Vector.empty
 }
 
 class FastEuclidianSpace extends Space
-  with Euclidian with FastFourierTransform with Kmeans {
+  with Euclidian with FastFourierTransform with Gaussian {
   var concepts: Vector[Concept] = Vector.empty
   var trajectories: Vector[Trajectory] = Vector.empty
 }
@@ -168,7 +231,7 @@ trait FastFourierTransform extends Transform {
     Concept(fft(trajectory.tensor.pad, Direction.Forward))
 
   def inverse(concept: Concept): Trajectory = concept.tensor match {
-    case tensor: Tensor => fft(tensor, Direction.Inverse)  match {
+    case tensor: Tensor => fft(tensor, Direction.Inverse) match {
       case tensor: Tensor => Trajectory(tensor.ts.map(c => Concept(c)))
     }
   }
