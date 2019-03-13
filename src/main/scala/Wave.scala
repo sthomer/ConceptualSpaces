@@ -36,8 +36,7 @@ object Wave extends App {
   // Transformation
   println("Transforming...")
   val size = 512 // samplesIn.length
-  val space = new FastEuclidianSpace
-  val timeSpace = new FastEuclidianSpace
+  val timeSpace = new EuclidianSpace
   val timeConcepts = samplesIn
     .map(r => Concept(r))
     .toVector
@@ -47,19 +46,21 @@ object Wave extends App {
     .map(a => Trajectory(a))
     .toVector
   timeSpace.trajectories = timeTrajectories
-  val freqSpace = new FastEuclidianSpace
+  val space = new FastLogEuclidianSpace
+  val freqSpace = new EuclidianSpace
   var freqConcepts = timeSpace.trajectories.map(space.transform)
   // Last one will (always) be shorter, so pad it
   freqConcepts = freqConcepts.init :+
     Concept(freqConcepts.last.tensor.padTo(freqConcepts.head.tensor.length))
 
+//  freqConcepts.map(c => println(space.norm(c)))
   println("Categorizing...")
   freqSpace.fill(freqConcepts)
-  val catSpace = new FastEuclidianSpace
+  val catSpace = new EuclidianSpace
   catSpace.concepts = freqSpace.categorize
   val dis = catSpace.concepts.distinct
-  println("# Original: " + freqSpace.concepts.length)
-  println("# Categories: " + dis.length)
+//  println("# Original: " + freqSpace.concepts.length)
+//  println("# Categories: " + dis.length)
   val frequencies = Trajectory(catSpace.concepts)
 //  val frequencies2 = space.transform(frequencies)
 //  val inverses2 = space.inverse(frequencies2)

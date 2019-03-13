@@ -287,7 +287,7 @@ case class Tensor(ts: Vector[TensorLike] = Vector()) extends TensorLike {
 
   def log: TensorLike = {
     def log(t: TensorLike): TensorLike = t match {
-      case c: Complex => c.log // Complex.log(c)
+      case c: Complex => c.log // principal logarithm
       case t: Tensor => Tensor(t.ts.map(log))
     }
     log(this)
