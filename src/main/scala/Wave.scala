@@ -46,7 +46,7 @@ object Wave extends App {
     .map(a => Trajectory(a))
     .toVector
   timeSpace.trajectories = timeTrajectories
-  val space = new FastLogEuclidianSpace
+  val space = new FastEuclidianSpace
   val freqSpace = new EuclidianSpace
   var freqConcepts = timeSpace.trajectories.map(space.transform)
   // Last one will (always) be shorter, so pad it
@@ -55,12 +55,13 @@ object Wave extends App {
 
 //  freqConcepts.map(c => println(space.norm(c)))
   println("Categorizing...")
-  freqSpace.fill(freqConcepts)
+  freqSpace.fill(freqConcepts.reverse)
   val catSpace = new EuclidianSpace
-  catSpace.concepts = freqSpace.categorize
+  catSpace.concepts = freqSpace.categorize.reverse
+//  catSpace.concepts.map(c => println(space.norm(c)))
   val dis = catSpace.concepts.distinct
-//  println("# Original: " + freqSpace.concepts.length)
-//  println("# Categories: " + dis.length)
+  println("# Original: " + freqSpace.concepts.length)
+  println("# Categories: " + dis.length)
   val frequencies = Trajectory(catSpace.concepts)
 //  val frequencies2 = space.transform(frequencies)
 //  val inverses2 = space.inverse(frequencies2)

@@ -16,6 +16,7 @@ case class Trajectory(concepts: Vector[Concept] = Vector()) extends Immutable {
 
 trait InnerProduct extends Space {
   def distance(a: Concept, b: Concept): Double
+
   def norm(c: Concept): Double
 }
 
@@ -33,12 +34,9 @@ trait MixedRadius extends Categorization {
   // When a new concept is added, immediately categorize
   //   with categories instead of concepts
   // Each category has its own mean and variance => mixed radius
-
-  
 }
 
 trait CommonRadius extends Categorization {
-
   // 1) Within radius of another category
   // 2) Decrease in mean information content
   //    -> post-transform, this is nearly always the case
@@ -53,48 +51,45 @@ trait CommonRadius extends Categorization {
   var M: Double = 0 // placeholder
   var S: Double = 0 // placeholder
   def V: Double = S / (concepts.length - 1)
+
   def sd: Double = math.sqrt(V)
 
   def seed(concept: Concept): Unit = {
     concepts = concepts :+ concept
     clumps = clumps :+ Set[Concept](concept)
-    M = norm(concept)
+    M = math.log(norm(concept) + 1)
     S = 0
   }
 
-  // Running Mean and Variance
-  // The Art of Programming - Knuth Vol. 2 pg. 232 3rd ed.
+  /*
+  Mean and variance are taken from the norms of concepts.
+  This is equivalent to lining up all concept vectors, and find the stddev.
+  The clumping radius is one stddev, so nearby vectors will also be clumped,
+  even if they are off-parallel.
+   */
   def clump(target: Concept): Set[Concept] = {
-    if(target.tensor finite) {
-      val x = norm(target)
-      val Mk = M + ((x - M) / concepts.length)
-      val Sk = S + ((x - M) * (x - Mk))
-      M = Mk
-      S = Sk
-    }
-    // FastFourierTransform -> not normal distribution (power law? log-normal?)
-    // FastLogFourierTransform -> normal distribution!
-
-    /*
-    Mean and variance are taken from the norms of concepts.
-    This is equivalent to lining up all concept vectors, and find the stddev.
-    The clumping radius is one stddev, so nearby, but not parallel, vectors
-    will also be clumped.
-     */
-
     clumps.filter(cl => cl.exists(c => {
-      val radius = sd * 2 // i.e. 95%
-      val targetDistance = distance(c, target)
+      val radius = sd // i.e. 0.5:38%, 0.68:50%, 1:68%, 2: 95%
+      val targetDistance = math.log(distance(c, target) + 1)
       val d = targetDistance - radius
       d < 0
     })).flatten.toSet + target
   }
 
+  // Running Mean and Variance
+  // The Art of Programming - Knuth Vol. 2 pg. 232 3rd ed.
   def feed(concept: Concept): Unit = {
     concepts = concepts :+ concept
+    if (concept.tensor finite) {
+      val x = math.log(norm(concept) + 1)
+      val Mk = M + ((x - M) / concepts.length)
+      val Sk = S + ((x - M) * (x - Mk))
+      M = Mk
+      S = Sk
+    }
     val cl = clump(concept)
-    clumps = (clumps :+ cl).map(c =>
-      if ((c & cl) != Set.empty) c | cl else c).distinct
+    clumps = (clumps :+ cl).map(clump =>
+      if ((clump & cl) != Set.empty) clump | cl else clump).distinct
   }
 
   def fill(concepts: Vector[Concept]): Unit = {
@@ -114,7 +109,6 @@ trait CommonRadius extends Categorization {
       .map(cl => centers(cl))
   }
 }
-
 
 
 trait Euclidian extends InnerProduct {
@@ -259,7 +253,7 @@ trait FastLogFourierTransform extends Transform {
             case Tensor(Vector(c: Complex)) => Tensor(Vector(c.exp))
             case Tensor(Vector(t: Tensor)) => Tensor(Vector(t.exp))
           }
-      }
+        }
       case t: Tensor =>
         val n = t.length
         (_fft(t.evens), _fft(t.odds)) match {
@@ -343,6 +337,47 @@ trait Kmeans extends Categorization {
     concepts.map(c => map(c))
   }
 }
+
+//var clumps: Vector[Set[Concept]] = Vector()
+//  var M: TensorLike = 0 // placeholder
+//  var S: TensorLike = 0 // placeholder
+//  def V: TensorLike = S / (concepts.length - 1)
+//
+//  def sd: TensorLike = Tensor.sqrt(V)
+//
+//  def seed(concept: Concept): Unit = {
+//    concepts = concepts :+ concept
+//    clumps = clumps :+ Set[Concept](concept)
+//    M = concept.tensor
+//    S = 0
+//  }
+//
+//  def clump(target: Concept): Set[Concept] = {
+//    val x = target.tensor
+//    if (x finite) { // denominator is slightly too big
+//      val Mk = M + ((x - M) / concepts.length)
+//      val Sk = S + ((x - M) * (x - Mk))
+//      M = Mk
+//      S = Sk
+//    }
+//
+//    clumps.filter(cl => cl.exists(c => {
+//      val s = sd * 2
+//      val v = norm(Concept(V))
+//      val targetDistance = distance(c, target)
+//      val radiusDistance = distance(c, Concept(c.tensor + sd))
+//      val d = targetDistance - radiusDistance
+//      d < 0
+//    })).flatten.toSet + target
+//  }
+//
+//  def feed(concept: Concept): Unit = {
+//      concepts = concepts :+ concept
+//
+//      val cl = clump(concept)
+//      clumps = (clumps :+ cl).map(clump =>
+//        if ((clump & cl) != Set.empty) clump | cl else clump).distinct
+//    }
 
 //object Trajectory {
 //  def fromConcepts(concepts: Vector[Concept]): Trajectory = {
