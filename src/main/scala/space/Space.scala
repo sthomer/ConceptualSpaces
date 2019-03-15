@@ -30,63 +30,60 @@ trait Categorization extends Space with InnerProduct {
   //  def quantize: Vector[Concept]
 }
 
-trait MixedRadius extends Categorization {
-  // When a new concept is added, immediately categorize
-  //   with categories instead of concepts
-  // Each category has its own mean and variance => mixed radius
-}
-
 trait CommonRadius extends Categorization {
   // 1) Within radius of another category
   // 2) Decrease in mean information content
   //    -> post-transform, this is nearly always the case
   //    => don't worry about it...
-
-  // Potentially useful data structures:
-  // Map from target to cluster
-  // Map from cluster to center
-  // Map from target to center??
+  val silenceUnion: Boolean = false
 
   var clumps: Vector[Set[Concept]] = Vector()
-  var M: Double = 0 // placeholder
-  var S: Double = 0 // placeholder
-  def V: Double = S / (concepts.length - 1)
+  var distincts: Set[Concept] = Set.empty
+  var min: Concept = Concept(0) //placeholder
+  var M: TensorLike = 0 // placeholder
+  var S: TensorLike = 0 // placeholder
 
-  def sd: Double = math.sqrt(V)
+  def sd: TensorLike =
+    if (distincts.size == 1) S
+    else Tensor.sqrt(S / (distincts.size - 1))
 
   def seed(concept: Concept): Unit = {
     concepts = concepts :+ concept
     clumps = clumps :+ Set[Concept](concept)
-    M = math.log(norm(concept) + 1)
+    distincts = distincts + concept
+    M = concept.tensor
     S = 0
   }
 
-  /*
-  Mean and variance are taken from the norms of concepts.
-  This is equivalent to lining up all concept vectors, and find the stddev.
-  The clumping radius is one stddev, so nearby vectors will also be clumped,
-  even if they are off-parallel.
-   */
+  // How to avoid union with silence?
+  // Explicitly forbid clumping with minimum concept
+  //   Minimum concept represents silence
+  //   Allows for larger clumping radius
+  // Allow silence clumping at first level, forbid thereafter
   def clump(target: Concept): Set[Concept] = {
-    clumps.filter(cl => cl.exists(c => {
-      val radius = sd // i.e. 0.5:38%, 0.68:50%, 1:68%, 2: 95%
-      val targetDistance = math.log(distance(c, target) + 1)
-      val d = targetDistance - radius
-      d < 0
-    })).flatten.toSet + target
+    val s = norm(Concept(sd))
+    val radius = s * 0.68 // (if (silenceUnion) 0.68 else 2) // 50% vs 95%
+    if (silenceUnion || (norm(target) > 0.05 * radius)) {
+      clumps.filter(cl => cl.exists(c => {
+        val targetDistance = distance(c, target)
+        val d = targetDistance - radius
+        (silenceUnion || (norm(c) > 0.05 * radius)) &&
+          d < 0
+      })).flatten.toSet + target
+    } else Set(target)
   }
 
-  // Running Mean and Variance
-  // The Art of Programming - Knuth Vol. 2 pg. 232 3rd ed.
   def feed(concept: Concept): Unit = {
     concepts = concepts :+ concept
-    if (concept.tensor finite) {
-      val x = math.log(norm(concept) + 1)
-      val Mk = M + ((x - M) / concepts.length)
+    val x = concept.tensor
+    if (!distincts(concept) && concept.tensor.finite) {
+      distincts = distincts + concept
+      val Mk = M + ((x - M) / distincts.size)
       val Sk = S + ((x - M) * (x - Mk))
       M = Mk
       S = Sk
     }
+
     val cl = clump(concept)
     clumps = (clumps :+ cl).map(clump =>
       if ((clump & cl) != Set.empty) clump | cl else clump).distinct
@@ -95,6 +92,8 @@ trait CommonRadius extends Categorization {
   def fill(concepts: Vector[Concept]): Unit = {
     seed(concepts.head)
     concepts.tail foreach feed
+    val s = norm(Concept(sd))
+    val t = 1
   }
 
   def center(members: Set[Concept]): Concept =
@@ -120,6 +119,8 @@ trait Euclidian extends InnerProduct {
 
   def norm(c: Concept): Double =
     Complex.sqrt((Tensor.conjugate(c.tensor) * c.tensor).sum).magnitude
+
+  def normalize(c: Concept): Concept = Concept(c.tensor / norm(c))
 }
 
 //trait Manhattan extends InnerProduct {
@@ -133,6 +134,10 @@ class EuclidianSpace extends Space
   with Euclidian with FourierTransform with CommonRadius {
   var concepts: Vector[Concept] = Vector.empty
   var trajectories: Vector[Trajectory] = Vector.empty
+}
+
+class SEuclidianSpace extends EuclidianSpace {
+  override val silenceUnion: Boolean = true
 }
 
 class FastEuclidianSpace extends Space
@@ -494,5 +499,57 @@ trait Kmeans extends Categorization {
 //      val d = targetDistance - radiusDistance
 //      d < 0
 //    })).flatten.toSet + target
+//  }
+
+//
+//  var clumps: Vector[Set[Concept]] = Vector()
+//  var distincts: Set[Concept] = Set.empty
+//  var M: Double = 0 // placeholder
+//  var S: Double = 0 // placeholder
+//  def V: Double = S / (concepts.length - 1)
+//
+//  def sd: Double = math.sqrt(V)
+//
+//  def seed(concept: Concept): Unit = {
+//    concepts = concepts :+ concept
+//    clumps = clumps :+ Set[Concept](concept)
+//    distincts = distincts + concept
+//    M = math.log(norm(concept) + 1)
+//    S = 0
+//  }
+//
+//  /*
+//  Mean and variance are taken from the norms of concepts.
+//  This is equivalent to lining up all concept vectors, and find the stddev.
+//  The clumping radius is one stddev, so nearby vectors will also be clumped,
+//  even if they are off-parallel.
+//   */
+//  def clump(target: Concept): Set[Concept] = {
+//    clumps.filter(cl => cl.exists(c => {
+//      val radius = sd // i.e. 0.5:38%, 0.68:50%, 1:68%, 2: 95%
+//      // TODO: ln(d+1) should not be necessary (or do anything?)
+//      val targetDistance = math.log(distance(c, target) + 1)
+//      val d = targetDistance - radius
+//      d < 0
+//    })).flatten.toSet + target
+//  }
+//
+//  // Running Mean and Variance
+//  // The Art of Programming - Knuth Vol. 2 pg. 232 3rd ed.
+//  def feed(concept: Concept): Unit = {
+//    concepts = concepts :+ concept
+//    if (!distincts(concept) && concept.tensor.finite) {
+//      // Using variance of distinct concepts to avoid biasing toward silence
+//      //   => calculating variance of space instead of variance of sequence
+//      distincts = distincts + concept
+//      val x = math.log(norm(concept) + 1)
+//      val Mk = M + ((x - M) / distincts.size)
+//      val Sk = S + ((x - M) * (x - Mk))
+//      M = Mk
+//      S = Sk
+//    }
+//    val cl = clump(concept)
+//    clumps = (clumps :+ cl).map(clump =>
+//      if ((clump & cl) != Set.empty) clump | cl else clump).distinct
 //  }
 

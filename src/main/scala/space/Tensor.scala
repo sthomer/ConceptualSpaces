@@ -70,6 +70,11 @@ object Tensor {
     case t: Tensor => Tensor(t.ts.map(exp))
   }
 
+  def magnitude(t: TensorLike): TensorLike = t match {
+    case c: Complex => c.magnitude
+    case t: Tensor => Tensor(t.ts.map(magnitude))
+  }
+
   def random(min: TensorLike, max: TensorLike): TensorLike = {
     def make(min: TensorLike, max: TensorLike): TensorLike = (min, max) match {
       case (min: Complex, max: Complex) => Complex(
@@ -155,8 +160,8 @@ case class Complex(re: Double = 0, im: Double = 0)
 
   def sum = this
 
-  val magnitude =
-    Math.sqrt(Math.pow(Math.abs(re), 2) + Math.pow(Math.abs(im), 2))
+  val magnitude: Double =
+    math.sqrt(math.pow(math.abs(re), 2) + math.pow(math.abs(im), 2))
 
   def finite = !(this.isNaN || this.isInfinite)
 
