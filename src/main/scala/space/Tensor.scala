@@ -4,125 +4,36 @@ import org.apache.commons.math3.complex
 import Implicits._
 
 object Implicits {
+
   implicit def toComplex(x: complex.Complex): Complex =
     Complex(x.getReal, x.getImaginary)
 
   implicit def toComplex(x: Complex): complex.Complex =
     new complex.Complex(x.getReal, x.getImaginary)
 
-  implicit def toComplex(x: Double): Complex = Complex(x, 0)
+  implicit def toComplex(x: Double): Complex =
+    Complex(x, 0)
 
-  implicit def toComplex(x: Int): Complex = Complex(x, 0)
+  implicit def toComplex(x: Int): Complex =
+    Complex(x, 0)
 }
 
 object Complex {
+
   val f = new complex.ComplexFormat
 
-  val empty = Complex()
-
-  def sqrt(c: Complex): Complex = c match {
-    case Complex.empty => c
-    case _ => c.pow(0.5)
-  }
-
-  def conjugate(c: Complex): Complex = c match {
-    case Complex.empty => c
-    case _ => c.pow(0.5)
-  }
-
-  def exp(c: Complex): Complex = Math.E.pow(c)
-
-  def exp(that: TensorLike): TensorLike = that match {
-    case c: Complex => Math.E.pow(c)
-    case t: Tensor => Tensor(t.ts.map(exp))
-  }
+  val I = new Complex(0, 1)
 }
 
 object Tensor {
-  val r = new scala.util.Random // nextDouble or nextGaussian?
 
   def ofShape(shape: Int*): Tensor = {
     def make(shape: Seq[Int]): TensorLike = shape.toList match {
-      case Nil => Complex.empty
+      case Nil => Complex()
       case x :: xs => Tensor(Vector.tabulate(x)(_ => make(xs)))
     }
 
     make(shape).asInstanceOf[Tensor]
-  }
-
-  def sqrt(t: TensorLike): TensorLike = t match {
-    case c: Complex => c.sqrt
-    case t: Tensor => Tensor(t.ts.map(sqrt))
-  }
-
-  def conjugate(t: TensorLike): TensorLike = t match {
-    case c: Complex => c.conjugate
-    case t: Tensor => Tensor(t.ts.map(conjugate))
-  }
-
-  def log(t: TensorLike): TensorLike = t match {
-    case c: Complex => c.log
-    case t: Tensor => Tensor(t.ts.map(log))
-  }
-
-  def exp(t: TensorLike): TensorLike = t match {
-    case c: Complex => c.exp
-    case t: Tensor => Tensor(t.ts.map(exp))
-  }
-
-  def magnitude(t: TensorLike): TensorLike = t match {
-    case c: Complex => c.magnitude
-    case t: Tensor => Tensor(t.ts.map(magnitude))
-  }
-
-  def random(min: TensorLike, max: TensorLike): TensorLike = {
-    def make(min: TensorLike, max: TensorLike): TensorLike = (min, max) match {
-      case (min: Complex, max: Complex) => Complex(
-        r.nextDouble * (max.re - min.re) + min.re, // or (r.nextGaussian + 0.5)
-        r.nextDouble * (max.im - min.im) + min.im) // or (r.nextGaussian + 0.5)
-      case (min: Tensor, max: Tensor) =>
-        Tensor(min.ts.zip(max.ts).map({ case (min, max) => make(min, max) }))
-    }
-    make(min, max)
-  }
-
-
-  def from(a: Array[Double]) = Tensor(a.toVector.map(Complex(_, 0)))
-
-  def min(a: TensorLike, b: TensorLike): TensorLike = {
-    def minRe(a: TensorLike, b: TensorLike): TensorLike = (a, b) match {
-      case (a: Complex, b: Complex) =>
-        Complex(math.min(a.re, b.re), 0)
-      case (a: Tensor, b: Tensor) =>
-        Tensor(a.ts.zip(b.ts).map({ case (a, b) => minRe(a, b) }))
-    }
-
-    def minIm(a: TensorLike, b: TensorLike): TensorLike = (a, b) match {
-      case (a: Complex, b: Complex) =>
-        Complex(0, math.max(a.im, b.im))
-      case (a: Tensor, b: Tensor) =>
-        Tensor(a.ts.zip(b.ts).map({ case (a, b) => minIm(a, b) }))
-    }
-
-    minRe(a, b) + minIm(a, b)
-  }
-
-  def max(a: TensorLike, b: TensorLike): TensorLike = {
-    def maxRe(a: TensorLike, b: TensorLike): TensorLike = (a, b) match {
-      case (a: Complex, b: Complex) =>
-        Complex(math.max(a.re, b.re), 0)
-      case (a: Tensor, b: Tensor) =>
-        Tensor(a.ts.zip(b.ts).map({ case (a, b) => maxRe(a, b) }))
-    }
-
-    def maxIm(a: TensorLike, b: TensorLike): TensorLike = (a, b) match {
-      case (a: Complex, b: Complex) =>
-        Complex(0, math.max(a.im, b.im))
-      case (a: Tensor, b: Tensor) =>
-        Tensor(a.ts.zip(b.ts).map({ case (a, b) => maxIm(a, b) }))
-    }
-
-    maxRe(a, b) + maxIm(a, b)
   }
 }
 
@@ -132,6 +43,8 @@ sealed trait TensorLike extends Immutable {
 
   def sum: Complex
 
+  def finite: Boolean
+
   def +(that: TensorLike): TensorLike
 
   def -(that: TensorLike): TensorLike
@@ -140,13 +53,17 @@ sealed trait TensorLike extends Immutable {
 
   def /(that: TensorLike): TensorLike
 
-  def head: TensorLike = this
+  def sqrt: TensorLike
+
+  def log: TensorLike
+
+  def exp: TensorLike
+
+  def conjugate: TensorLike
 
   def pad: TensorLike = this
 
   def padTo(max: Int): TensorLike = this
-
-  def finite: Boolean
 }
 
 case class Complex(re: Double = 0, im: Double = 0)
@@ -154,18 +71,21 @@ case class Complex(re: Double = 0, im: Double = 0)
 
   override def toString: String = Complex.f.format(this)
 
-  def i = Complex(0, this.getReal) // allows for e.g. 1 + 2.i
+  val length: Int = 1
 
-  val length: Int = 1 // or 0?
+  val sum: Complex = this
 
-  def sum = this
+  val magnitude: Double = abs
 
-  val magnitude: Double =
-    math.sqrt(math.pow(math.abs(re), 2) + math.pow(math.abs(im), 2))
+  val finite: Boolean = !(this.isNaN || this.isInfinite)
 
-  def finite = !(this.isNaN || this.isInfinite)
+  override def conjugate: Complex = super.conjugate
 
-  // Scala Operations
+  override def exp: Complex = super.exp
+
+  override def log: Complex = super.log
+
+  override def sqrt: Complex = super.sqrt
 
   def +(that: TensorLike): TensorLike = that match {
     case c: Complex => this add c
@@ -196,9 +116,7 @@ case class Tensor(ts: Vector[TensorLike] = Vector()) extends TensorLike {
     case (t: Tensor, rest) => t(rest: _*)
   }
 
-  def length: Int = ts.length // make val?
-
-  override def head: TensorLike = ts.head
+  val length: Int = ts.length // i.e. length of "top-level"
 
   def ++(that: Tensor): Tensor = Tensor(this.ts ++ that.ts)
 
@@ -219,7 +137,7 @@ case class Tensor(ts: Vector[TensorLike] = Vector()) extends TensorLike {
     this ++ Tensor.ofShape(max - length :: shape.tail: _*)
 
   def shape: List[Int] = {
-    def shape(t: Tensor): List[Int] = t.head match {
+    def shape(t: Tensor): List[Int] = t.ts.head match {
       case tensor: Tensor => t.length :: shape(tensor)
       case _ => List(t.length)
     }
@@ -227,18 +145,6 @@ case class Tensor(ts: Vector[TensorLike] = Vector()) extends TensorLike {
     shape(this)
   }
 
-  def rounded: Tensor = {
-    import scala.math.round
-    def rounded(tensor: Tensor): TensorLike =
-      Tensor(tensor.ts.map({
-        case c: Complex => Complex(round(c.re).toDouble, round(c.im).toDouble)
-        case t: Tensor => rounded(t)
-      }))
-
-    rounded(this).asInstanceOf[Tensor]
-  }
-
-  // This is akin to flattening the tensor to a vector and summing
   def sum: Complex = {
     def sum(tensor: Tensor): TensorLike = {
       val ts = tensor.ts
@@ -258,75 +164,50 @@ case class Tensor(ts: Vector[TensorLike] = Vector()) extends TensorLike {
     s.asInstanceOf[Complex]
   }
 
-  def evens: Tensor =
+  lazy val evens: Tensor =
     Tensor(ts.grouped(2).map(t => t.head).toVector)
 
-  def odds: Tensor =
+  lazy val odds: Tensor =
     Tensor(ts.grouped(2).map(t => t.last).toVector)
-
-  // Abstract these to a map (maybe also make a reduce?)
 
   def finite: Boolean = {
     def finite(t: TensorLike): Boolean = t match {
       case c: Complex => c.finite
       case t: Tensor => t.ts.forall(finite)
     }
+
     finite(this)
   }
 
-  def sqrt: TensorLike = {
-    def sqrt(t: TensorLike): TensorLike = t match {
-      case c: Complex => c.sqrt
-      case t: Tensor => Tensor(t.ts.map(sqrt))
+  def map(fn: Complex => Complex): TensorLike = {
+    def map(t: TensorLike): TensorLike = t match {
+      case c: Complex => fn(c)
+      case t: Tensor => Tensor(t.ts.map(map))
     }
-    sqrt(this)
+
+    map(this)
   }
 
-  def conjugate: TensorLike = {
-    def conjugate(t: TensorLike): TensorLike = t match {
-      case c: Complex => c.conjugate
-      case t: Tensor => Tensor(t.ts.map(conjugate))
+  def sqrt: TensorLike = map(_.sqrt)
+
+  def conjugate: TensorLike = map(_.conjugate)
+
+  def log: TensorLike = map(_.log)
+
+  def exp: TensorLike = map(_.exp)
+
+  def binOp(that: TensorLike)
+           (op: (TensorLike, TensorLike) => TensorLike): TensorLike =
+    that match {
+      case c: Complex => Tensor(ts.map(t => op(t, c)))
+      case t: Tensor => Tensor(ts.zip(t.ts).map({ case (a, b) => op(a, b) }))
     }
-    conjugate(this)
-  }
 
-  def log: TensorLike = {
-    def log(t: TensorLike): TensorLike = t match {
-      case c: Complex => c.log // principal logarithm
-      case t: Tensor => Tensor(t.ts.map(log))
-    }
-    log(this)
-  }
+  def +(that: TensorLike): TensorLike = binOp(that)(_ + _)
 
-  def exp: TensorLike = {
-    def exp(t: TensorLike): TensorLike = t match {
-      case c: Complex => c.exp
-      case t: Tensor => Tensor(t.ts.map(exp))
-    }
-    exp(this)
-  }
+  def -(that: TensorLike): TensorLike = binOp(that)(_ - _)
 
-  // Frobenius Operations
+  def *(that: TensorLike): TensorLike = binOp(that)(_ * _)
 
-  def +(that: TensorLike): TensorLike = that match {
-    case c: Complex => Tensor(ts.map(t => t + c))
-    case t: Tensor => Tensor(ts.zip(t.ts).map({ case (a, b) => a + b }))
-  }
-
-  def -(that: TensorLike): TensorLike = that match {
-    case c: Complex => Tensor(ts.map(t => t - c))
-    case t: Tensor => Tensor(ts.zip(t.ts).map({ case (a, b) => a - b }))
-  }
-
-  def *(that: TensorLike): TensorLike = that match {
-    case c: Complex => Tensor(ts.map(t => t * c))
-    case t: Tensor => Tensor(ts.zip(t.ts).map({ case (a, b) => a * b }))
-  }
-
-  def /(that: TensorLike): TensorLike = that match {
-    case c: Complex => Tensor(ts.map(t => t / c))
-    case t: Tensor => Tensor(ts.zip(t.ts).map({ case (a, b) => a / b }))
-  }
+  def /(that: TensorLike): TensorLike = binOp(that)(_ / _)
 }
-
-
