@@ -6,7 +6,7 @@ import javax.sound.sampled._
 
 object Wave extends App {
 
-  withAudio("src/main/scala/export.wav") { input =>
+  withAudio("src/main/scala/train_dr1_fcjf0.wav") { input =>
 
     println("Transforming...")
     val size = 256
@@ -20,32 +20,34 @@ object Wave extends App {
       .toVector
     timeSpace.trajectories = timeTrajectories
     val space = new EuclidianSpace
-    val freqSpace = // Allow silence union to combine background noise
-      new { override val silenceUnion: Boolean = true } with EuclidianSpace
     var freqConcepts = timeSpace.trajectories.map(space.transform)
     // Last one will (always) be shorter, so pad it
     freqConcepts = freqConcepts.init :+
       Concept(freqConcepts.last.tensor.padTo(freqConcepts.head.tensor.length))
 
     println("Categorizing...")
+    val freqSpace = new RawEuclidianSpace
     freqSpace.fill(freqConcepts)
     val catSpace = new EuclidianSpace
     catSpace.fill(freqSpace.categorize)
-    val dis = catSpace.concepts.distinct
-
-    println("Categorizing Again...")
     val catSpace2 = new EuclidianSpace
     catSpace2.concepts = catSpace.categorize
-    val dis2 = catSpace2.concepts.distinct
 
-    println("# Original: " + freqSpace.concepts.length)
-    //  freqSpace.concepts.map(c => println(space.norm(c)))
-    println("# Categories: " + dis.length)
-    //  catSpace.concepts.map(c => println(space.norm(c)))
-    println("# Categories 2: " + dis2.length)
-    //  catSpace2.concepts.map(c => println(space.norm(c)))
+    println("# Original: " + freqSpace.concepts.distinct.length)
+    println("# Categories: " + catSpace.concepts.distinct.length)
+    println("# Categories 2: " + catSpace2.concepts.distinct.length)
 
-    val frequencies = Trajectory(catSpace2.concepts)
+    val segSpace = new EuclidianSpace
+    segSpace.concepts = catSpace2.concepts
+    segSpace.chop(catSpace2.concepts)
+    segSpace.concepts = segSpace.segmentize
+
+    println("# Categories 3: " + segSpace.concepts.distinct.length)
+
+    toDat("cats", catSpace2.concepts.map(c => space.norm(c)))
+    toDat("segs", segSpace.concepts.map(c => space.norm(c)))
+
+    val frequencies = Trajectory(segSpace.concepts)
     //  val frequencies2 = space.transform(frequencies)
     //  val inverses2 = space.inverse(frequencies2)
 
@@ -55,6 +57,14 @@ object Wave extends App {
     outConcepts
       .map(c => c.tensor)
       .map({ case c: Complex => c.getReal })
+  }
+
+  def toDat(name: String, data: Seq[Any]): Unit = {
+    val out = data.mkString("\n")
+    val file = new File("src/main/scala/analysis/out/" + name + ".dat")
+    val bw = new BufferedWriter(new FileWriter(file))
+    bw.write(out)
+    bw.close()
   }
 
   def withAudio(filename: String)(op: Vector[Double] => Vector[Double]): Unit = {
@@ -83,12 +93,12 @@ object Wave extends App {
       sample = sampleSigned.toDouble / fullScale
     } yield sample).toVector
 
-    // Do the thing.
+    // Do the damn thing.
     val samplesTrans = op(samplesIn).toArray
 
     // Encode
     println("Playing...")
-    val ratio = 1 // samplesTrans.length.toFloat / samplesIn.length
+    val ratio = samplesTrans.length.toFloat / samplesIn.length
     val samplesOut = (for {
       sample <- samplesTrans
       long = (sample * fullScale).toLong // signed

@@ -3,8 +3,13 @@ package space
 import Implicits._
 
 trait Space { // make immutable??
-  var concepts: Vector[Concept]
-  var trajectories: Vector[Trajectory]
+  var concepts: Vector[Concept] = Vector.empty
+  var trajectories: Vector[Trajectory] = Vector.empty
+}
+
+object Concept {
+  def combine(a: Concept, b: Concept): Concept =
+    Concept(a.tensor + b.tensor / 2)
 }
 
 case class Concept(tensor: TensorLike) extends Immutable
@@ -25,20 +30,46 @@ trait Transform extends Space with InnerProduct {
   def inverse(c: Concept): Trajectory
 }
 
-trait Categorization extends Space with InnerProduct {
-  //  def quantize: Vector[Concept]
+trait Segmentation extends Space with InnerProduct
+
+trait RisingEntropy extends Segmentation {
+  val m = new Model
+  var segments: Vector[(Concept, Concept)] = Vector()
+
+  def add(current: Concept, next: Concept): Unit = m.add(current, next)
+
+  def detect(previous: Concept, current: Concept): Boolean = {
+    val c = m.entropy(current)
+    println(c)
+    m.entropy(previous) < m.entropy(current)
+  }
+
+//  def segment(current: Concept, next: Concept): Concept =
+//    Concept.combine(current, next)
+
+  def chop(concepts: Vector[Concept]): Unit =
+    concepts.sliding(3).foreach({
+      case Vector(previous: Concept, current: Concept, next: Concept) =>
+        add(current, next)
+        if (detect(previous, current)) {
+          segments = segments :+ (current, next)
+        }
+    })
+
+  def segmentize: Vector[Concept] = {
+    val segmented = segments.flatMap(p => {
+      val c = Concept.combine(p._1, p._2)
+      List((p._1, c), (p._2, c))
+    }).toMap
+    concepts.map(c => segmented.getOrElse(c, c))
+  }
 }
 
-trait CommonRadius extends Categorization {
-  // 1) Within radius of another category
-  // 2) Decrease in mean information content
-  //    -> post-transform, this is nearly always the case
-  //    => don't worry about it...
-  val silenceUnion: Boolean = false
+trait Categorization extends Space with InnerProduct
 
+trait VarianceRadius extends Categorization {
   var clumps: Vector[Set[Concept]] = Vector()
   var distincts: Set[Concept] = Set.empty
-  var min: Concept = Concept(0) //placeholder
   var M: TensorLike = 0 // placeholder
   var S: TensorLike = 0 // placeholder
 
@@ -46,30 +77,15 @@ trait CommonRadius extends Categorization {
     if (distincts.size == 1) S
     else (S / (distincts.size - 1)).sqrt
 
-  def seed(concept: Concept): Unit = {
-    concepts = concepts :+ concept
-    clumps = clumps :+ Set[Concept](concept)
-    distincts = distincts + concept
-    M = concept.tensor
-    S = 0
-  }
+  def radius: Double = norm(Concept(sd)) * 0.68
 
-  // How to avoid union with silence?
-  // Explicitly forbid clumping with minimum concept
-  //   Minimum concept represents silence
-  //   Allows for larger clumping radius
-  // Allow silence clumping at first level, forbid thereafter
   def clump(target: Concept): Set[Concept] = {
-    val s = norm(Concept(sd))
-    val radius = s * 0.68 // (if (silenceUnion) 0.68 else 2) // 50% vs 95%
-    if (silenceUnion || (norm(target) > 0.05 * radius)) {
-      clumps.filter(cl => cl.exists(c => {
-        val targetDistance = distance(c, target)
-        val d = targetDistance - radius
-        (silenceUnion || (norm(c) > 0.05 * radius)) &&
-          d < 0
-      })).flatten.toSet + target
-    } else Set(target)
+    val r = radius
+    (if (norm(target) > 0.05 * r)
+      clumps.filter(cl => cl.exists(c =>
+        norm(c) > 0.05 * r && distance(c, target) < r
+      )).flatten.toSet
+    else Set[Concept]()) + target
   }
 
   def feed(concept: Concept): Unit = {
@@ -88,10 +104,7 @@ trait CommonRadius extends Categorization {
       if ((clump & cl) != Set.empty) clump | cl else clump).distinct
   }
 
-  def fill(concepts: Vector[Concept]): Unit = {
-    seed(concepts.head)
-    concepts.tail foreach feed
-  }
+  def fill(concepts: Vector[Concept]): Unit = concepts foreach feed
 
   def center(members: Set[Concept]): Concept =
     Concept(members
@@ -106,6 +119,14 @@ trait CommonRadius extends Categorization {
   }
 }
 
+trait NoiseRadius extends VarianceRadius {
+  override def clump(target: Concept): Set[Concept] = {
+    val r = radius
+    clumps.filter(cl => cl.exists(c => distance(c, target) < r))
+      .flatten.toSet + target
+  }
+}
+
 trait Euclidian extends InnerProduct {
   def norm(c: Concept): Double =
     (c.tensor.conjugate * c.tensor).sqrt.sum.magnitude
@@ -117,11 +138,12 @@ trait Euclidian extends InnerProduct {
     Concept(c.tensor / norm(c))
 }
 
+class RawEuclidianSpace extends Space
+  with Euclidian with FastFourierTransform with NoiseRadius
+
 class EuclidianSpace extends Space
-  with Euclidian with FastFourierTransform with CommonRadius {
-  var concepts: Vector[Concept] = Vector.empty
-  var trajectories: Vector[Trajectory] = Vector.empty
-}
+  with Euclidian with FastFourierTransform
+  with VarianceRadius with RisingEntropy
 
 object Direction {
 
