@@ -6,7 +6,7 @@ import javax.sound.sampled._
 
 object Wave extends App {
 
-  withAudio("src/main/scala/train_dr1_fcjf0.wav") { input =>
+  withAudio("src/main/scala/export.wav") { input =>
 
     println("Transforming...")
     val size = 256
@@ -41,6 +41,9 @@ object Wave extends App {
     segSpace.concepts = catSpace2.concepts
     segSpace.chop(catSpace2.concepts)
     segSpace.concepts = segSpace.segmentize
+
+    val intSpace = new EuclidianSpace
+    val inters = segSpace.segments.map(segment => space.interpolate(segment))
 
     println("# Categories 3: " + segSpace.concepts.distinct.length)
 

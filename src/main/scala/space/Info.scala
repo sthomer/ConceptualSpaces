@@ -8,7 +8,7 @@ class Model {
   val is: Map[Concept, Int] = Map().withDefaultValue(0)
 
   def meanInfo: Double =
-    is.keys.map(c => info(c)).sum / is.size.toDouble
+    is.keys.map(c => info(c)).sum
 
   def info(concept: Concept): Double =
     - math.log(is(concept) / is.values.sum)

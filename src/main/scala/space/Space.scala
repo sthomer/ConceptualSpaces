@@ -8,8 +8,10 @@ trait Space { // make immutable??
 }
 
 object Concept {
-  def combine(a: Concept, b: Concept): Concept =
-    Concept(a.tensor + b.tensor / 2)
+  def combine(cs: Vector[Concept]): Concept = Concept(cs
+    .map(c => c.tensor)
+    .reduce[TensorLike]((acc, t) => acc + t)
+    / cs.length)
 }
 
 case class Concept(tensor: TensorLike) extends Immutable
@@ -30,39 +32,65 @@ trait Transform extends Space with InnerProduct {
   def inverse(c: Concept): Trajectory
 }
 
+trait Interpolation extends Space with InnerProduct {
+  val resolution = 256
+
+  def interpolate(cs: Vector[Concept]): Vector[Concept]
+}
+
+trait LinearFill extends Interpolation {
+
+  /*
+  Linear Interpolation:
+  - Each part is of equal length
+  - Sum of length of the parts equals the length of the whole
+  - Each part (and whole) has the same angle with respect to any given vector
+   */
+
+  def interpolate(cs: Vector[Concept]): Vector[Concept] = {
+    val K = resolution / cs.length // assume resolution > cs.length
+    (cs :+ cs.head).sliding(2)
+      .flatMap({ case Vector(Concept(a), Concept(b)) =>
+        val delta = (a - b) / (K - 1) // assumes Euclidian inner product
+        (0 until K).map(k => Concept(a + (delta * k)))
+      }).toVector
+  }
+}
+
 trait Segmentation extends Space with InnerProduct
 
 trait RisingEntropy extends Segmentation {
   val m = new Model
-  var segments: Vector[(Concept, Concept)] = Vector()
+  var segments: Vector[Vector[Concept]] = Vector()
+  var ongoing: Vector[Concept] = Vector()
 
   def add(current: Concept, next: Concept): Unit = m.add(current, next)
 
   def detect(previous: Concept, current: Concept): Boolean = {
-    val c = m.entropy(current)
-    println(c)
+    //    val c = m.entropy(current)
+    //    println(c)
     m.entropy(previous) < m.entropy(current)
   }
 
-//  def segment(current: Concept, next: Concept): Concept =
-//    Concept.combine(current, next)
+  //  def segment(current: Concept, next: Concept): Concept =
+  //    Concept.combine(current, next)
 
   def chop(concepts: Vector[Concept]): Unit =
     concepts.sliding(3).foreach({
       case Vector(previous: Concept, current: Concept, next: Concept) =>
         add(current, next)
         if (detect(previous, current)) {
-          segments = segments :+ (current, next)
+          segments = segments :+ ongoing
+          ongoing = Vector()
         }
+        ongoing = ongoing :+ current
     })
 
-  def segmentize: Vector[Concept] = {
-    val segmented = segments.flatMap(p => {
-      val c = Concept.combine(p._1, p._2)
-      List((p._1, c), (p._2, c))
-    }).toMap
-    concepts.map(c => segmented.getOrElse(c, c))
-  }
+  def segmentize: Vector[Concept] =
+    segments.flatMap(segment => {
+      val concept = Concept.combine(segment) // Interpolate + Transform
+      segment.map(c => concept)
+    })
 }
 
 trait Categorization extends Space with InnerProduct
@@ -143,7 +171,7 @@ class RawEuclidianSpace extends Space
 
 class EuclidianSpace extends Space
   with Euclidian with FastFourierTransform
-  with VarianceRadius with RisingEntropy
+  with VarianceRadius with RisingEntropy with LinearFill
 
 object Direction {
 
