@@ -18,9 +18,8 @@ object Wave extends App {
       .grouped(size)
       .map(a => Trajectory(a))
       .toVector
-    timeSpace.trajectories = timeTrajectories
     val space = new EuclidianSpace
-    var freqConcepts = timeSpace.trajectories.map(space.transform)
+    var freqConcepts = timeTrajectories.map(space.transform)
     // Last one will (always) be shorter, so pad it
     freqConcepts = freqConcepts.init :+
       Concept(freqConcepts.last.tensor.padTo(freqConcepts.head.tensor.length))

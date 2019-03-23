@@ -2,9 +2,14 @@ package space
 
 import Implicits._
 
-trait Space { // make immutable??
-  var concepts: Vector[Concept] = Vector.empty
-  var trajectories: Vector[Trajectory] = Vector.empty
+trait Space extends InnerProduct with Transform
+  with Categorization with Segmentation { // make immutable??
+
+  this: InnerProduct with Transform
+    with Categorization with Segmentation =>
+
+//  var concepts: Vector[Concept] = Vector.empty
+//  var trajectories: Vector[Trajectory] = Vector.empty // unnecessary?
 }
 
 object Concept {
@@ -14,25 +19,25 @@ object Concept {
     / cs.length)
 }
 
-case class Concept(tensor: TensorLike) extends Immutable
+case class Concept(tensor: TensorLike)
 
-case class Trajectory(concepts: Vector[Concept] = Vector()) extends Immutable {
+case class Trajectory(concepts: Vector[Concept] = Vector.empty) {
   lazy val tensor = Tensor(concepts map (_.tensor))
 }
 
-trait InnerProduct extends Space {
+trait InnerProduct {
   def distance(a: Concept, b: Concept): Double
 
   def norm(c: Concept): Double
 }
 
-trait Transform extends Space with InnerProduct {
+trait Transform extends InnerProduct {
   def transform(t: Trajectory): Concept
 
   def inverse(c: Concept): Trajectory
 }
 
-trait Interpolation extends Space with InnerProduct {
+trait Interpolation extends InnerProduct {
   val resolution = 256
 
   def interpolate(cs: Vector[Concept]): Vector[Concept]
@@ -57,23 +62,21 @@ trait LinearFill extends Interpolation {
   }
 }
 
-trait Segmentation extends Space with InnerProduct
+trait Segmentation extends InnerProduct with Interpolation {
+  def segment(concept: Concept): Option[Concept]
+}
 
-trait RisingEntropy extends Segmentation {
+trait RisingEntropy extends Segmentation with LinearFill {
   val m = new Model
   var segments: Vector[Vector[Concept]] = Vector()
   var ongoing: Vector[Concept] = Vector()
 
   def add(current: Concept, next: Concept): Unit = m.add(current, next)
 
-  def detect(previous: Concept, current: Concept): Boolean = {
-    //    val c = m.entropy(current)
-    //    println(c)
+  def detect(previous: Concept, current: Concept): Boolean =
     m.entropy(previous) < m.entropy(current)
-  }
 
-  //  def segment(current: Concept, next: Concept): Concept =
-  //    Concept.combine(current, next)
+  def segment(concept: Concept): Option[Concept] = None // placeholder
 
   def chop(concepts: Vector[Concept]): Unit =
     concepts.sliding(3).foreach({
@@ -93,10 +96,18 @@ trait RisingEntropy extends Segmentation {
     })
 }
 
-trait Categorization extends Space with InnerProduct
+trait Categorization extends InnerProduct {
+
+  // inferior -> superior
+  def categorize(concept: Concept): Option[Concept]
+}
 
 trait VarianceRadius extends Categorization {
-  var clumps: Vector[Set[Concept]] = Vector()
+
+  // TODO: Check cross-entropy reduction + convexity before clumping
+
+  var concepts: Vector[Concept] = Vector.empty
+  var clumps: Vector[Set[Concept]] = Vector.empty
   var distincts: Set[Concept] = Set.empty
   var M: TensorLike = 0 // placeholder
   var S: TensorLike = 0 // placeholder
@@ -131,6 +142,8 @@ trait VarianceRadius extends Categorization {
     clumps = (clumps :+ cl).map(clump =>
       if ((clump & cl) != Set.empty) clump | cl else clump).distinct
   }
+
+  def categorize(concept: Concept): Option[Concept] = None // placeholder
 
   def fill(concepts: Vector[Concept]): Unit = concepts foreach feed
 
@@ -167,7 +180,8 @@ trait Euclidian extends InnerProduct {
 }
 
 class RawEuclidianSpace extends Space
-  with Euclidian with FastFourierTransform with NoiseRadius
+  with Euclidian with FastFourierTransform
+  with NoiseRadius with RisingEntropy with LinearFill
 
 class EuclidianSpace extends Space
   with Euclidian with FastFourierTransform
