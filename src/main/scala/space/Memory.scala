@@ -1,105 +1,155 @@
 package space
 
-/*
-For now, assume there is only one dimension per abstraction layer
-  and there is only one inner product.
-Therefore, there are at most two partitions for each dimension,
-  the categorization partition and the segmentation partition.
-*/
-case class Memory(perception: Dimension = Dimension.empty,
-//                  abstractions: Vector[Dimension] = Vector.empty,
-                  categorizations: Map[Dimension, Partition] =
-                  Map.empty.withDefaultValue(Partition.empty),
-                  segmentations: Map[Dimension, Partition] =
-                  Map.empty.withDefaultValue(Partition.empty)) {
+import java.util.UUID
 
-  def categorize(concept: Concept,
-                 dimension: Dimension,
-                 fixedPoint: Boolean = false): Memory =
-    dimension.categorize(concept, categorizations(dimension)) match {
-      case None if fixedPoint =>
-        copy(categorizations =
-          categorizations + (dimension -> categorizations(dimension)))
-      case None if !fixedPoint =>
-        segment(concept, dimension, fixedPoint = true)
-      case Some(Partition(_, superior, _)) =>
-        categorize(superior.concepts.last, superior)
-    }
+case class Node(private val id: String = UUID.randomUUID().toString.take(5),
+                var concept: Concept = Concept.empty) {
 
-  def segment(concept: Concept,
-              dimension: Dimension,
-              fixedPoint: Boolean = false): Memory =
-    dimension.segment(concept, segmentations(dimension)) match {
-      case None if fixedPoint =>
-        copy(segmentations =
-          segmentations + (dimension -> segmentations(dimension)))
-      case None if !fixedPoint =>
-        categorize(concept, dimension, fixedPoint = true)
-      case Some(Partition(_, superior, _)) =>
-        segment(superior.concepts.last, superior)
-    }
+  var set: Set[Concept] = Set(concept)
+  private var _space: Space = new EuclidianSpace
+  private var _prev: Option[Node] = None
+  private var _next: Option[Node] = None
+  private var _up: Option[Node] = None
+  private var _down: Option[Node] = None
 
-  def perceive(concept: Concept): Memory =
-    categorize(concept, perception :+ concept) // or start with segment?
-}
+  def space: Space = _space
 
-object Dimension {
-  def empty: Dimension = Dimension()
-}
+  def space_=(space: Space): Unit = {
+    _space = space
+    _space.feed(concept)
+  }
 
-// Later, space could be library of spaces i.e. Vector[Space]
-case class Dimension(private val id: Int = hashCode,
-                     space: Space = new EuclidianSpace,
-                     concepts: Vector[Concept] = Vector.empty) {
+  override def toString: String = id
 
   override def equals(that: Any): Boolean = that match {
-    case that: Dimension => (that canEqual this) && id == that.id
+    case that: Node => id == that.id
     case _ => false
   }
 
-  override def canEqual(that: Any): Boolean = that.isInstanceOf[Dimension]
+  override def hashCode: Int = id.hashCode()
 
-  override def hashCode: Int = id
+  def prev: Option[Node] = _prev
 
-  def :+(concept: Concept): Dimension = {
-    copy(concepts = concepts :+ concept)
+  def prev_=(node: Node): Unit = _prev = Some(node)
+
+  def next: Option[Node] = _next
+
+  def next_=(node: Node): Unit = _next = Some(node)
+
+  def up: Node = _up match {
+    case None =>
+      val category = Node(concept = concept)
+      category.down = this
+      _up = Some(category)
+      category
+    case Some(node) =>
+      node
   }
 
-  // Superior is equal rank tensor to inferior
-  def categorize(concept: Concept, partition: Partition): Option[Partition] = {
-    space.categorize(concept) match {
-      case None => None
-      case Some(category) =>
-        val s = partition.subtend
-        Some(partition.copy(
-          inferior = this,
-          superior = partition.superior :+ category,
-          subtend = s + (category -> (s(category) :+ concept).distinct)))
-    }
+  def up_=(node: Node): Unit = _up = Some(node)
+
+  def down: Node = _down match {
+    case None => // This should never happen?
+      val node = Node(concept = concept)
+      node.space = this.space
+      node.up = this
+      _down = Some(node)
+      node
+    case Some(node) =>
+      node
   }
 
-  // Superior is higher rank tensor than inferior
-  def segment(concept: Concept, partition: Partition): Option[Partition] = {
-    space.segment(concept) match {
-      case None => None
-      case Some(segment) =>
-        val s = partition.subtend
-        Some(partition.copy(
-          inferior = this,
-          superior = partition.superior :+ segment,
-          subtend = s + (segment -> (s(segment) :+ concept))))
-    }
+  def down_=(node: Node): Unit = _down = Some(node)
+}
+
+object Memory {
+  def make(concept: Concept): Memory = {
+    val mem = Memory()
+    val root = Node(concept = concept)
+    mem.root = root
+    mem
   }
 }
 
-object Partition {
-  def empty: Partition = Partition()
+case class Memory(var root: Node = Node()) {
+
+  import scala.collection.mutable
+
+  // For now, all mappings in same map (this is technically unsafe,
+  //   but it most likely won't matter b/c concepts are so sparse
+  val catpart: mutable.Map[Concept, Set[Concept]] =
+    mutable.Map.empty.withDefaultValue(Set.empty)
+
+  def collect(node: Node): Vector[Option[Node]] = node.prev match {
+    case None => Vector(Some(node))
+    case Some(prev: Node) => collect(prev) :+ Some(node)
+  }
+
+  def perceive(concept: Concept): Unit = {
+    val current = Node(concept = concept)
+    current.space = root.space
+    current.prev = root
+    root.next = current
+    current.prev = root
+
+    categorize(current)
+    //    segment(current)
+
+    root = current
+  }
+
+  // Currently, single shot categorization
+  def categorize(node: Node): Unit = {
+    val prevCategory = node.prev.get.up
+    node.space.catset(node.concept) match {
+      case (cat, set) =>
+        catpart += cat -> set
+        val category = Node(concept = cat)
+        category.space = prevCategory.space
+        category.set = set
+        category.prev = prevCategory
+        prevCategory.next = category
+        category.down = node
+        node.up = category
+    }
+  }
+
+  //  def replace(node: Node, set: Set[Concept]): Unit = {
+  //    val excluded = set.flatMap(catpart(_)) + node.concept
+  //    node.space.catset(node.concept, excluded) match {
+  //      case (cat, set) =>
+  //        catpart += cat -> set
+  //        if (node.space.distance(node.concept, cat) > 1E-10) {
+  //          node.concept = cat
+  //          node.set = set
+  //          replace(node, set)
+  //        }
+  //    }
+  //  }
+
+  //  def segment(node: Node): Unit = {
+  //    node.space.seg(node.concept) match {
+  //      case None =>
+  //      case Some(concept) =>
+  //        val category = Node(concept = concept)
+  //        subtend(node.prev, category)
+  //        segment(category)
+  //    }
+  //  }
+  //
+  //  def subtend(node: Option[Node], category: Node): Unit = node match {
+  //    case None => // Beginning of abstraction layer
+  //    case Some(node: Node) => node.up match {
+  //      case None =>
+  //        node.up = Some(category)
+  //        category.down = Some(category.down match {
+  //          case None => Vector(node)
+  //          case Some(v) => node +: v
+  //        })
+  //        subtend(node.prev, category)
+  //      case Some(prevUp: Node) =>
+  //        category.prev = Some(prevUp)
+  //    }
+  //  }
 }
 
-// subtend: Superior -> Inferiors
-// Should there be different partition types for Categorization and Segmentation?
-// i.e. Categorization = Concept -> Set; Segmentation = Concept -> Vector
-case class Partition(inferior: Dimension = Dimension.empty,
-                     superior: Dimension = Dimension.empty,
-                     subtend: Map[Concept, Vector[Concept]]
-                     = Map.empty.withDefaultValue(Vector.empty))

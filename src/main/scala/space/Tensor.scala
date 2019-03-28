@@ -22,7 +22,7 @@ object Complex {
 
   val f = new complex.ComplexFormat
 
-  val I = new Complex(0, 1)
+  val i = new Complex(0, 1)
 }
 
 object Tensor {

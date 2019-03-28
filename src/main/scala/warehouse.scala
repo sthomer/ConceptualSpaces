@@ -1,5 +1,204 @@
 class warehouse {}
 
+//def categorize(node: Node): Unit = {
+//    node.space.cat(node.concept) match {
+//      case None => None
+//      case Some(concept) =>
+//        val category = Node(concept = concept)
+//        node.up = Some(category)
+//        category.down = Some(Vector(node))
+//        category.prev = node.prev match {
+//          case None => None
+//          case Some(prev: Node) => prev.up match {
+//            case None =>
+//              prev.next = Some(category)
+//              category.space = prev.space // Same space?? Seems wrong
+//              Some(prev)
+//            case Some(prevUp: Node) =>
+//              prevUp.next = Some(category)
+//              category.space = prevUp.space
+//              Some(prevUp)
+//          }
+//        }
+//        categorize(category)
+//    }
+//  }
+
+//  def categorize(node: NodeLike): NodeLike = node match {
+//    case NullNode => NullNode
+//    case node: Node => space.cat(node.concept) match {
+//      case None => NullNode
+//      case Some(concept) =>
+//        val category = Node(concept = concept, down = node,
+//          prev = node.up match {
+//            case NullNode => node
+//            case node: Node => node.up
+//          }
+//        )
+//        node.up = category
+//        categorize(category)
+//    }
+//  }
+
+///*
+//For now, assume there is only one dimension per abstraction layer
+//  and there is only one inner product.
+//Therefore, there are at most two partitions for each dimension,
+//  the categorization partition and the segmentation partition.
+//*/
+//class Memory(var perception: Dimension = Dimension.empty) {
+//
+//  // Map[Inferior, Partition(Inferior, Superior, Up, Down)]
+//  var categorizations: Map[Dimension, Partition] = Map.empty
+//  //  var segmentations: Map[Dimension, Partition] = Map.empty
+//
+//  def catLayers: Vector[Dimension] = {
+//    def catLayer(dimension: Dimension): Vector[Dimension] =
+//      dimension match {
+//        case d: Dimension if d.concepts.isEmpty => Vector()
+//        case d: Dimension =>
+//          dimension +: catLayer(categorizations(dimension).superior)
+//      }
+//
+//    catLayer(perception)
+//  }
+//
+//  def categorize(concept: Concept,
+//                 dimension: Dimension,
+//                 fixedPoint: Boolean = false): Unit = {
+//    val partition = dimension.categorize(concept,
+//      categorizations.getOrElse(dimension, Partition(inferior = dimension)))
+//    val previous = categorizations.getOrElse(dimension, partition).down.keySet
+//    categorizations = categorizations + (dimension -> partition)
+//    if (partition.down.keySet != previous + concept) {
+//      val category = partition.up(concept)
+//      partition.superior += category
+//      //      categorize(category, partition.superior)
+//    } else if (!fixedPoint) {
+//      //      segment(concept, dimension, fixedPoint = true)
+//    }
+//  }
+//
+//  //    def segment(concept: Concept,
+//  //                dimension: Dimension,
+//  //                fixedPoint: Boolean = false): Unit =
+//  //      dimension.segment(concept, segmentations(dimension)) match {
+//  //        case None =>
+//  //          if (!fixedPoint)
+//  //            categorize(concept, dimension, fixedPoint = true)
+//  //        case Some(partition@Partition(_, superior, _)) =>
+//  //          segmentations =
+//  //            segmentations + (dimension -> partition)
+//  //          segment(superior.concepts.last, superior)
+//  //      }
+//
+//  def perceive(concept: Concept): Unit = {
+//    perception += concept
+//    categorize(concept, perception) // or start with segment?
+//  }
+//}
+//
+//object Dimension {
+//  def empty: Dimension = Dimension()
+//}
+//
+//// Later, space could be library of spaces i.e. Vector[Space]
+//case class Dimension(id: String = UUID.randomUUID().toString.take(5)) {
+//  var space: Space = new RawEuclidianSpace
+//  var concepts: Vector[Concept] = Vector.empty
+//
+//  def +=(concept: Concept): Unit = {
+//    concepts = concepts :+ concept
+//    //    space += concept
+//  }
+//
+//  // None means nothing new was categorized
+//  def categorize(concept: Concept, partition: Partition): Partition = {
+//    val conCatMap = space.catpart(concept)
+//    val inv = conCatMap.toVector
+//      .groupBy({ case (con, cat) => cat })
+//      .mapValues(_.map(_._2))
+//    partition.copy(up = conCatMap, down = inv)
+//  }
+//
+//  //  def segment(concept: Concept, partition: Partition): Partition = {
+//  //    val conSegMap = space.segpart(concept)
+//  //    val inc = conSegMap.map({case (con, seg) =>
+//  //      seg.map()})
+//  //  }
+//
+//  //  // Superior is higher rank tensor than inferior
+//  //    def segment(concept: Concept, partition: Partition): Option[Partition] = {
+//  //      space.segment(concept) match {
+//  //        case None => None
+//  //        case Some(mapping@(symbol, _)) =>
+//  //          Some(partition.copy(
+//  //            inferior = this,
+//  //            superior = partition.superior :+ symbol,
+//  //            subtending = partition.subtending + mapping))
+//  //      }
+//  //    }
+//}
+//
+//object Partition {
+//  def empty: Partition = Partition()
+//}
+//
+//// subtend: Superior -> Inferiors
+//// Should there be different partition types for Categorization and Segmentation?
+//// i.e. Categorization = Concept -> Set; Segmentation = Concept -> Vector
+//case class Partition(inferior: Dimension = Dimension.empty,
+//                     superior: Dimension = Dimension.empty,
+//                     up: Map[Concept, Concept] = Map.empty,
+//                     down: Map[Concept, Vector[Concept]] = Map.empty) {
+//  //  import scala.collection.mutable
+//  //  val up: mutable.Map[Concept, Concept] =
+//  //    mutable.Map.empty.withDefaultValue(Concept.empty)
+//  //  val down: mutable.Map[Concept, Vector[Concept]] =
+//  //    mutable.Map.empty.withDefaultValue(Vector.empty)
+//}
+
+//        val disjunct = set.toList.combinations(2)
+//          .filter({ case List(a, b) => (catpart(a) & catpart(b)) == Set.empty })
+//          .flatMap({ case List(a, b) => catpart(a) | catpart(b)})
+//          .toVector.distinct
+//        if (set.size > 1 && set.toList.combinations(2)
+//          .exists({ case List(a, b) => (catpart(a) & catpart(b)) == Set.empty }))
+//        if (node.space.distance(node.concept, category.concept) > 1E-10)
+//          replace(category, set)
+
+//def catpart(concept: Concept): Map[Concept, Concept] = {
+//    //    feed(concept) // this is done in when the space is set on a node
+//    clumps.flatMap(cl => {
+//      val category = center(cl)
+//      cl.map(c => c -> category)
+//    }).toMap
+//  }
+//
+//  def cat(concept: Concept): Option[Concept] = {
+//    feed(concept)
+//    val category = center(clumps.find(cl => cl(concept)).get)
+//    if (concept == category) None
+//    else Some(category)
+//  }
+//
+//  def categorize(concept: Concept): Option[(Concept, Vector[Concept])] = {
+//    val previous = clumps.find(cl => cl(concept))
+//    feed(concept)
+//    val current = clumps.find(cl => cl(concept))
+//    if (previous == current || Set(concept) == current.get) None
+//    else Some(center(current.get) -> current.get.toVector)
+//  }
+//
+//  def categorize2(concept: Concept): Option[(Concept, Map[Concept, Vector[Concept]])] = {
+//    val previous = clumps.map(cl => center(cl) -> cl.toVector).toMap
+//    feed(concept)
+//    val current = clumps.map(cl => center(cl) -> cl.toVector).toMap
+//    val category = center(clumps.find(cl => cl(concept)).get)
+//    if (previous == current) None
+//    else Some((category, current))
+//  }
+
 //trait FourierTransform extends Transform {
 //
 //  def transform(trajectory: Trajectory): Concept =

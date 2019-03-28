@@ -7,7 +7,32 @@ import javax.sound.sampled._
 object Wave extends App {
 
   withAudio("src/main/scala/export.wav") { input =>
+    println("Transforming...")
+    val size = 256
+    val timeSpace = new EuclidianSpace
+    val timeConcepts = input
+      .map(r => Concept(r))
+    timeSpace.concepts = timeConcepts
+    val timeTrajectories = timeSpace.concepts
+      .grouped(size)
+      .map(a => Trajectory(a))
+      .toVector
+    val space = new EuclidianSpace
+    var freqConcepts = timeTrajectories.map(space.transform)
+    // Last one will (always) be shorter, so pad it
+    freqConcepts = freqConcepts.init :+
+      Concept(freqConcepts.last.tensor.padTo(freqConcepts.head.tensor.length))
 
+    val mem = Memory.make(freqConcepts.head)
+    freqConcepts.tail.foreach(c => mem.perceive(c))
+    val nodes = mem.collect(mem.root).map(o => o.get.set.size)
+    val nodes2 = mem.collect(mem.root.up).map(o => o.get.set.size)
+//    val cl = mem.catLayers
+
+    Vector.empty[Double] // For the compiler
+  }
+
+  def test(input: Vector[Double]): Vector[Double] = {
     println("Transforming...")
     val size = 256
     val timeSpace = new EuclidianSpace
