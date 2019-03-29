@@ -14,7 +14,7 @@ object Wave extends App {
       .map(r => Concept(r))
     timeSpace.concepts = timeConcepts
     val timeTrajectories = timeSpace.concepts
-      .grouped(size)
+      .grouped(size) //.sliding(size, size / 2)
       .map(a => Trajectory(a))
       .toVector
     val space = new EuclidianSpace
@@ -27,80 +27,23 @@ object Wave extends App {
     freqConcepts.tail.foreach(c => mem.perceive(c))
     val nodes = mem.dimensions.indices.map(mem.collectN(_, mem.root))
 
-    //    val rows = nodes.head.indices map { i =>
-    //      val row = nodes map { dimension =>
-    //        dimension(i) match {
-    //          case None => 0
-    //          case Some(node) => space.norm(node.concept)
-    //            // norm of matrix overflows to infinity...
-    //        }
-    //      }
-    //      row.mkString(",")
-    //    }
-    //    toDat("multicat", rows)
+    val rows = nodes.head.indices map { i =>
+      val row = nodes map { dimension =>
+        dimension(i) match {
+          case None => 0
+          case Some(node) => space.norm(node.concept)
+        }
+      }
+      row.mkString(",")
+    }
+    toDat("slide", rows)
 
-    //    val frequencies = Trajectory(segSpace.concepts)
-    //  val frequencies2 = space.transform(frequencies)
     println("Inverting...")
     mem.dimensionAt(2).concepts
       .flatMap(space.inverse(_).concepts)
       .flatMap(space.inverse(_).concepts)
       .map(_.tensor)
       .map({ case c: Complex => c re })
-  }
-
-  def test(input: Vector[Double]): Vector[Double] = {
-    println("Transforming...")
-    val size = 256
-    val timeSpace = new EuclidianSpace
-    val timeConcepts = input
-      .map(r => Concept(r))
-    timeSpace.concepts = timeConcepts
-    val timeTrajectories = timeSpace.concepts
-      .grouped(size)
-      .map(a => Trajectory(a))
-      .toVector
-    val space = new EuclidianSpace
-    var freqConcepts = timeTrajectories.map(space.transform)
-    // Last one will (always) be shorter, so pad it
-    freqConcepts = freqConcepts.init :+
-      Concept(freqConcepts.last.tensor.padTo(freqConcepts.head.tensor.length))
-
-    println("Categorizing...")
-    val freqSpace = new RawEuclidianSpace
-    freqSpace.fill(freqConcepts)
-    val catSpace = new EuclidianSpace
-    catSpace.fill(freqSpace.categorize)
-    val catSpace2 = new EuclidianSpace
-    catSpace2.concepts = catSpace.categorize
-
-    println("# Original: " + freqSpace.concepts.distinct.length)
-    println("# Categories: " + catSpace.concepts.distinct.length)
-    println("# Categories 2: " + catSpace2.concepts.distinct.length)
-
-    val segSpace = new EuclidianSpace
-    segSpace.concepts = catSpace2.concepts
-    //    segSpace.chop(catSpace2.concepts)
-    segSpace.concepts = segSpace.segmentize
-
-    val intSpace = new EuclidianSpace
-    val inters = segSpace.segments.map(segment => space.interpolate(segment))
-
-    println("# Categories 3: " + segSpace.concepts.distinct.length)
-
-    toDat("cats", catSpace2.concepts.map(c => space.norm(c)))
-    toDat("segs", segSpace.concepts.map(c => space.norm(c)))
-
-    val frequencies = Trajectory(segSpace.concepts)
-    //  val frequencies2 = space.transform(frequencies)
-    //  val inverses2 = space.inverse(frequencies2)
-
-    println("Inverting...")
-    val inverses = frequencies.concepts.map(space.inverse)
-    val outConcepts = inverses.flatMap(t => t.concepts)
-    outConcepts
-      .map(c => c.tensor)
-      .map({ case c: Complex => c.getReal })
   }
 
   def toDat(name: String, data: Seq[Any]): Unit = {
@@ -181,3 +124,56 @@ object Wave extends App {
   //  sox $(find -iname '*.WAV') ~/Downloads/out.wav
 }
 
+//def test(input: Vector[Double]): Vector[Double] = {
+//    println("Transforming...")
+//    val size = 256
+//    val timeSpace = new EuclidianSpace
+//    val timeConcepts = input
+//      .map(r => Concept(r))
+//    timeSpace.concepts = timeConcepts
+//    val timeTrajectories = timeSpace.concepts
+//      .grouped(size)
+//      .map(a => Trajectory(a))
+//      .toVector
+//    val space = new EuclidianSpace
+//    var freqConcepts = timeTrajectories.map(space.transform)
+//    // Last one will (always) be shorter, so pad it
+//    freqConcepts = freqConcepts.init :+
+//      Concept(freqConcepts.last.tensor.padTo(freqConcepts.head.tensor.length))
+//
+//    println("Categorizing...")
+//    val freqSpace = new RawEuclidianSpace
+//    freqSpace.fill(freqConcepts)
+//    val catSpace = new EuclidianSpace
+//    catSpace.fill(freqSpace.categorize)
+//    val catSpace2 = new EuclidianSpace
+//    catSpace2.concepts = catSpace.categorize
+//
+//    println("# Original: " + freqSpace.concepts.distinct.length)
+//    println("# Categories: " + catSpace.concepts.distinct.length)
+//    println("# Categories 2: " + catSpace2.concepts.distinct.length)
+//
+//    val segSpace = new EuclidianSpace
+//    segSpace.concepts = catSpace2.concepts
+//    //    segSpace.chop(catSpace2.concepts)
+//    segSpace.concepts = segSpace.segmentize
+//
+//    val intSpace = new EuclidianSpace
+//    val inters = segSpace.segments.map(segment => space.interpolate(segment))
+//
+//    println("# Categories 3: " + segSpace.concepts.distinct.length)
+//
+//    toDat("cats", catSpace2.concepts.map(c => space.norm(c)))
+//    toDat("segs", segSpace.concepts.map(c => space.norm(c)))
+//
+//    val frequencies = Trajectory(segSpace.concepts)
+//    //  val frequencies2 = space.transform(frequencies)
+//    //  val inverses2 = space.inverse(frequencies2)
+//
+//    println("Inverting...")
+//    val inverses = frequencies.concepts.map(space.inverse)
+//    val outConcepts = inverses.flatMap(t => t.concepts)
+//    outConcepts
+//      .map(c => c.tensor)
+//      .map({ case c: Complex => c.getReal })
+//  }

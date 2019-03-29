@@ -14,7 +14,4 @@ trait Euclidian extends InnerProduct {
 
   def distance(a: Concept, b: Concept): BigDecimal =
     norm(Concept(a.tensor - b.tensor))
-
-//  def normalize(c: Concept): Concept =
-//    Concept(c.tensor / norm(c))
 }

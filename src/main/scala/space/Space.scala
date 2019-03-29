@@ -9,14 +9,6 @@ trait Space extends InnerProduct with Transform
 
   this: InnerProduct with Transform
     with Categorization with Segmentation =>
-
-  //  var concepts: Vector[Concept] = Vector.empty
-  //  var trajectories: Vector[Trajectory] = Vector.empty // unnecessary?
-
-  def +=(concept: Concept): Unit = {
-    attach(concept)
-    feed(concept)
-  }
 }
 
 object Concept {
@@ -29,26 +21,18 @@ object Concept {
 }
 
 case class Concept(tensor: TensorLike) {
-  var label: String = UUID.randomUUID().toString.take(5)
+  var categories: Set[String] = Set(UUID.randomUUID().toString.take(5))
 
-  override def toString: String = label
-//
-//  override def equals(that: Any): Boolean = that match {
-//    case that: Concept => label == that.label
-//    case _ => false
-//  }
-//
-//  override def hashCode: Int = label.hashCode()
-
+  override def toString: String = categories.mkString(",")
 }
 
 case class Trajectory(concepts: Vector[Concept] = Vector.empty) {
   lazy val tensor = Tensor(concepts map (_.tensor))
 }
 
-class RawEuclidianSpace extends Space
-  with Euclidian with FastFourierTransform
-  with NoiseRadius with RisingEntropy with LinearFill
+//class RawEuclidianSpace extends Space
+//  with Euclidian with FastFourierTransform
+//  with NoiseRadius with RisingEntropy with LinearFill
 
 class EuclidianSpace extends Space
   with Euclidian with FastFourierTransform

@@ -77,7 +77,7 @@ case class Complex(re: Double = 0, im: Double = 0)
 
   val sum: Complex = this
 
-  val total: BigDecimal = this re
+  val total: BigDecimal = BigDecimal(this.re)
 
   val magnitude: Double = abs
 

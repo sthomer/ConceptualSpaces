@@ -1,5 +1,186 @@
 class warehouse {}
 
+//  def add(previous: Concept, current: Concept): Unit = m.add(previous, current)
+//
+//  def chop(concepts: Vector[Concept]): Unit = {
+//    (Concept.empty +: concepts).sliding(2).foreach({
+//      case Vector(previous: Concept, current: Concept) =>
+//        add(previous, current)
+//        if (detect(previous, current)) {
+//          segments = segments :+ ongoing
+//          ongoing = Vector.empty
+//        }
+//        ongoing = ongoing :+ current
+//    })
+//    segments = segments :+ ongoing
+//    ongoing = Vector.empty
+//  }
+
+//  def segmentize: Vector[Concept] =
+//    segments.flatMap(segment => {
+//      val concept = Concept.combine(segment) // i.e. Interpolate + Transform
+//      segment.map(c => concept)
+//    })
+
+ //  var clumps: Vector[Set[Concept]] = Vector.empty
+//  //  var distincts: Set[Concept] = Set.empty
+//
+////  def catset(concept: Concept): (Concept, Set[Concept]) = {
+////    val set = clumps
+////      .filter(cl => cl.head.label != concept.label)
+////      .find(cl => cl(concept))
+////      .getOrElse(Set(concept))
+////    propagateLabels()
+////    val category = center(set)
+////    category -> set
+////  }
+//
+//  //  def sd: TensorLike =
+//  //    if (concepts.size == 1) S
+//  //    else (S / (concepts.size - 1)).sqrt
+//
+//  //  def radius: BigDecimal = norm(Concept(sd)) * 0.68
+//
+////  def clump(target: Concept): Set[Concept] = {
+////    val r = radius
+////    (if (norm(target) > 0.05 * r)
+////      clumps.filter(cl => cl.head.label != target.label)
+////        .filter(cl => cl.exists(c =>
+////          norm(c) > 0.05 * r && distance(c, target) < r
+////        )).flatten.toSet
+////    else Set.empty[Concept]) + target
+////  }
+//
+////  def feed(concept: Concept): Unit = {
+////    concepts = concepts :+ concept
+////    val x = concept.tensor
+////    if (!distincts(concept) && concept.tensor.finite) {
+////      distincts = distincts + concept
+////      val Mk = M + ((x - M) / distincts.size)
+////      val Sk = S + ((x - M) * (x - Mk))
+////      M = Mk
+////      S = Sk
+////    }
+////
+////    val cl = clump(concept)
+////    clumps = (clumps :+ cl).map(clump =>
+////      if ((clump & cl) != Set.empty) clump | cl else clump).distinct
+////  }
+//
+////  def propagateLabels(): Unit =
+////    clumps foreach { clump =>
+////      val label = clump.head.label
+////      clump foreach { concept =>
+////        concept.label = label
+////      }
+////    }
+//
+////  def fill(concepts: Vector[Concept]): Unit = concepts foreach (c => feed(c))
+//
+////  def center(members: Set[Concept]): Concept = {
+////    val category = Concept(members
+////      .map(c => c.tensor)
+////      .reduce[TensorLike]((acc, t) => acc + t) / members.size)
+////    category.label = members.head.label
+////    category
+////  }
+//
+////  def categorize: Vector[Concept] = {
+////    val centers = clumps.map(cl => cl -> center(cl)).toMap
+////    concepts.flatMap(c => clumps.find(cl => cl(c)))
+////      .map(cl => centers(cl))
+////  }
+//}
+//
+//// No 5% cutoff vs VarianceRadius
+//trait NoiseRadius extends VarianceRadius {
+////  override def clump(target: Concept): Set[Concept] = {
+////    val r = radius
+////    clumps
+////      .filter(cl => cl.exists(c => distance(c, target) < r))
+////      .flatten.toSet + target
+////  }
+////
+////  override def feed(concept: Concept): Unit = {
+////    concepts = concepts :+ concept
+////    val x = concept.tensor
+////    if (!distincts(concept) && concept.tensor.finite) {
+////      distincts = distincts + concept
+////      val Mk = M + ((x - M) / distincts.size)
+////      val Sk = S + ((x - M) * (x - Mk))
+////      M = Mk
+////      S = Sk
+////    }
+////
+////    val cl = clump(concept)
+////    clumps = (clumps :+ cl).map(clump =>
+////      if ((clump & cl) != Set.empty) clump | cl else clump).distinct
+////  }
+//}
+
+  //  def space: Space = _space
+  //
+  //  def space_=(space: Space): Unit = {
+  //    _space = space
+  //    _space.feed(concept)
+  //  }
+
+  //  def up: Node = _up match {
+  //    case None =>
+  //      val category = Node(concept = concept, level = level + 1)
+  //      category.down = this
+  //      _up = Some(category)
+  //      category
+  //    case Some(node) =>
+  //      node
+  //  }
+  //
+  //  def up_=(node: Node): Unit = _up = Some(node)
+  //
+  //  def down: Node = _down match {
+  //    case None => // This should never happen?
+  //      val node = Node(concept = concept, level = level - 1)
+  ////      node.space = this.space
+  //      node.up = this
+  //      _down = Some(node)
+  //      node
+  //    case Some(node) =>
+  //      node
+  //  }
+  //
+  //  def down_=(node: Node): Unit = _down = Some(node)
+
+//  import scala.collection.mutable
+
+  // For now, all mappings in same map (this is technically unsafe,
+  //   but it most likely won't matter b/c concepts are so sparse
+  // superior -> inferior
+//  val categoryPartition: mutable.Map[Concept, Set[Concept]] =
+//  mutable.Map.empty.withDefaultValue(Set.empty)
+
+  //  def categorize(node: Node): Unit = {
+  //    val prevCategory = node.prevCategory
+  //    dimensionAt(node.level).catset(node.concept) match {
+  //      case (cat, set) =>
+  //
+  //        val category = Node(concept = cat, level = node.level + 1)
+  //        dimensionAt(category.level).feed(category.concept)
+  //        category.set = set
+  //        category.prev = prevCategory
+  //        prevCategory foreach {
+  //          _.next = category
+  //        }
+  //        category.down = node
+  //        node.up = category
+  //
+  //        categoryPartition += cat -> set
+  //        categoryPartition foreach { case (c, s) => c.label = s.head.label }
+  //
+  //       Just categorizing (small) noise after first categorization
+  //       if (node.concept != cat) categorize(category)
+  //    }
+  //  }
+
 // This puts multiple levels of categorization in one space
   // Which we shouldn't do...
 //    def replace(node: Node): Unit = {
