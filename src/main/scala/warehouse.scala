@@ -1,5 +1,20 @@
 class warehouse {}
 
+// This puts multiple levels of categorization in one space
+  // Which we shouldn't do...
+//    def replace(node: Node): Unit = {
+//      node.space.catset(node.concept) match {
+//        case (cat, set) =>
+//          if (node.concept != cat) {
+//            categoryPartition += cat -> set
+//            categoryPartition foreach { case (c, s) => c.label = s.head.label }
+//            node.concept = cat
+//            node.set = set
+//            replace(node)
+//          }
+//      }
+//    }
+
 //def categorize(node: Node): Unit = {
 //    node.space.cat(node.concept) match {
 //      case None => None

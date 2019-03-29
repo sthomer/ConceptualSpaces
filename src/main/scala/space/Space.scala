@@ -28,17 +28,17 @@ object Concept {
   val empty = Concept(Complex())
 }
 
-case class Concept(tensor: TensorLike,
-                   var label: String = UUID.randomUUID().toString.take(5)) {
+case class Concept(tensor: TensorLike) {
+  var label: String = UUID.randomUUID().toString.take(5)
 
   override def toString: String = label
-
-  override def equals(that: Any): Boolean = that match {
-    case that: Concept => label == that.label
-    case _ => false
-  }
-
-  override def hashCode: Int = label.hashCode()
+//
+//  override def equals(that: Any): Boolean = that match {
+//    case that: Concept => label == that.label
+//    case _ => false
+//  }
+//
+//  override def hashCode: Int = label.hashCode()
 
 }
 

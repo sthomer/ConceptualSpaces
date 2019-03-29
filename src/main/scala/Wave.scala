@@ -25,9 +25,19 @@ object Wave extends App {
 
     val mem = Memory.make(freqConcepts.head)
     freqConcepts.tail.foreach(c => mem.perceive(c))
-    val nodes = mem.collect(mem.root).map(o => o.get.set.size)
-    val nodes2 = mem.collect(mem.root.up).map(o => o.get.set.size)
-//    val cl = mem.catLayers
+    val nodes = mem.dimensions.indices.map(mem.collectN(_, mem.root))
+
+    val rows = nodes.head.indices map { i =>
+      val row = nodes map { dimension =>
+        dimension(i) match {
+          case None => 0
+          case Some(node) => space.norm(node.concept)
+            // norm of matrix overflows to infinity...
+        }
+      }
+      row.mkString(",")
+    }
+    toDat("multicat", rows)
 
     Vector.empty[Double] // For the compiler
   }
@@ -63,7 +73,7 @@ object Wave extends App {
 
     val segSpace = new EuclidianSpace
     segSpace.concepts = catSpace2.concepts
-    segSpace.chop(catSpace2.concepts)
+//    segSpace.chop(catSpace2.concepts)
     segSpace.concepts = segSpace.segmentize
 
     val intSpace = new EuclidianSpace

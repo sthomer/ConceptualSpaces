@@ -21,7 +21,7 @@ trait LinearFill extends Interpolation {
   def interpolate(cs: Vector[Concept]): Vector[Concept] = {
     val K = resolution / cs.length // assume resolution > cs.length
     (cs :+ cs.head).sliding(2)
-      .flatMap({ case Vector(Concept(a, _), Concept(b, _)) =>
+      .flatMap({ case Vector(Concept(a), Concept(b)) =>
         val delta = (a - b) / (K - 1)
         (0 until K).map(k => Concept(a + (delta * k)))
       }).toVector
