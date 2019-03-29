@@ -7,6 +7,8 @@ trait Segmentation extends InnerProduct with Interpolation with Transform {
     var category: Option[Concept] = None
     if (detect(previous, concept)) {
       segments = segments :+ ongoing
+      // different trajectory lengths will be in different spaces
+//      category = Some(transform(Trajectory(ongoing)))
       category = Some(transform(Trajectory(interpolate(ongoing))))
       ongoing = Vector.empty
     }

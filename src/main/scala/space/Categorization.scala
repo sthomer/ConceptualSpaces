@@ -35,7 +35,7 @@ trait VarianceRadius extends Categorization {
     if (distincts.size == 1) S
     else (S / (distincts.size - 1)).sqrt
 
-  def radius: Double = norm(Concept(sd)) * 0.68
+  def radius: BigDecimal = norm(Concept(sd)) * 0.68
 
   def clump(target: Concept): Set[Concept] = {
     val r = radius

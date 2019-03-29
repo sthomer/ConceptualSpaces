@@ -27,19 +27,26 @@ object Wave extends App {
     freqConcepts.tail.foreach(c => mem.perceive(c))
     val nodes = mem.dimensions.indices.map(mem.collectN(_, mem.root))
 
-    val rows = nodes.head.indices map { i =>
-      val row = nodes map { dimension =>
-        dimension(i) match {
-          case None => 0
-          case Some(node) => space.norm(node.concept)
-            // norm of matrix overflows to infinity...
-        }
-      }
-      row.mkString(",")
-    }
-    toDat("multicat", rows)
+    //    val rows = nodes.head.indices map { i =>
+    //      val row = nodes map { dimension =>
+    //        dimension(i) match {
+    //          case None => 0
+    //          case Some(node) => space.norm(node.concept)
+    //            // norm of matrix overflows to infinity...
+    //        }
+    //      }
+    //      row.mkString(",")
+    //    }
+    //    toDat("multicat", rows)
 
-    Vector.empty[Double] // For the compiler
+    //    val frequencies = Trajectory(segSpace.concepts)
+    //  val frequencies2 = space.transform(frequencies)
+    println("Inverting...")
+    mem.dimensionAt(2).concepts
+      .flatMap(space.inverse(_).concepts)
+      .flatMap(space.inverse(_).concepts)
+      .map(_.tensor)
+      .map({ case c: Complex => c re })
   }
 
   def test(input: Vector[Double]): Vector[Double] = {
@@ -73,7 +80,7 @@ object Wave extends App {
 
     val segSpace = new EuclidianSpace
     segSpace.concepts = catSpace2.concepts
-//    segSpace.chop(catSpace2.concepts)
+    //    segSpace.chop(catSpace2.concepts)
     segSpace.concepts = segSpace.segmentize
 
     val intSpace = new EuclidianSpace
@@ -135,7 +142,7 @@ object Wave extends App {
 
     // Encode
     println("Playing...")
-    val ratio = samplesTrans.length.toFloat / samplesIn.length
+    val ratio = 1 //samplesTrans.length.toFloat / samplesIn.length
     val samplesOut = (for {
       sample <- samplesTrans
       long = (sample * fullScale).toLong // signed
@@ -152,14 +159,24 @@ object Wave extends App {
       2, // Frame Size
       16000.toFloat * ratio, // FrameRate (for slow: * 0.5F)
       false) // Big-Endian?
+
     val sampleIn = new AudioInputStream(
       new ByteArrayInputStream(samplesOut), format, samplesOut.length)
+
+    val sampleIn2 = new AudioInputStream(
+      new ByteArrayInputStream(samplesOut), format, samplesOut.length)
+
+    AudioSystem.write(
+      sampleIn, AudioFileFormat.Type.WAVE,
+      new File("src/main/scala/analysis/out/out.wav"))
+
     val clip = AudioSystem.getClip(null)
-    clip.open(sampleIn)
+    clip.open(sampleIn2)
     clip.start()
     clip.drain()
     clip.close()
   }
+
   // Concatenate all WAVs in dir and subdirs with:
   //  sox $(find -iname '*.WAV') ~/Downloads/out.wav
 }

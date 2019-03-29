@@ -43,6 +43,8 @@ sealed trait TensorLike extends Immutable {
 
   def sum: Complex
 
+  def total: BigDecimal
+
   def finite: Boolean
 
   def +(that: TensorLike): TensorLike
@@ -74,6 +76,8 @@ case class Complex(re: Double = 0, im: Double = 0)
   val length: Int = 1
 
   val sum: Complex = this
+
+  val total: BigDecimal = this re
 
   val magnitude: Double = abs
 
@@ -143,6 +147,27 @@ case class Tensor(ts: Vector[TensorLike] = Vector()) extends TensorLike {
     }
 
     shape(this)
+  }
+
+  // Only valid if tensor components are real-valued
+  def total: BigDecimal = {
+    def total(tensor: Tensor): BigDecimal = {
+      val ts = tensor.ts
+      if (ts.length == 1) // foldLeft returns unevaled with one element
+        ts.head match {
+          case c: Complex => c.total
+          case t: Tensor => total(t)
+        }
+      else
+        ts.foldLeft(BigDecimal(0.0)) { (acc, t) =>
+          acc + (t match {
+            case c: Complex => c.total
+            case t: Tensor => total(t)
+          })
+        }
+    }
+
+    total(this)
   }
 
   def sum: Complex = {

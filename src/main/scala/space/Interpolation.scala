@@ -3,7 +3,7 @@ package space
 import Implicits._
 
 trait Interpolation extends InnerProduct {
-  val resolution = 256
+  val resolution = 64
 
   def interpolate(cs: Vector[Concept]): Vector[Concept]
 }
