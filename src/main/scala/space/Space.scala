@@ -2,38 +2,29 @@ package space
 
 import java.util.UUID
 
-import Implicits._
+trait Space extends InnerProduct with Transform {
+  this: InnerProduct with Transform =>
 
-trait Space extends InnerProduct with Transform
-  with Categorization with Segmentation { // make immutable??
+  var concepts: Vector[Concept] = Vector.empty
 
-  this: InnerProduct with Transform
-    with Categorization with Segmentation =>
+  def add(concept: Concept): Unit = {
+    concepts = concepts :+ concept
+  }
 }
 
 object Concept {
-  def combine(cs: Vector[Concept]): Concept = Concept(cs
-    .map(c => c.tensor)
-    .reduce[TensorLike]((acc, t) => acc + t)
-    / cs.length)
-
   val empty = Concept(Complex())
 }
 
 case class Concept(tensor: TensorLike) {
-  var categories: Set[String] = Set(UUID.randomUUID().toString.take(5))
+  var category: String = UUID.randomUUID().toString.take(5)
 
-  override def toString: String = categories.mkString(",")
+  override def toString: String = category
 }
 
 case class Trajectory(concepts: Vector[Concept] = Vector.empty) {
   lazy val tensor = Tensor(concepts map (_.tensor))
 }
 
-//class RawEuclidianSpace extends Space
-//  with Euclidian with FastFourierTransform
-//  with NoiseRadius with RisingEntropy with LinearFill
-
 class EuclidianSpace extends Space
   with Euclidian with FastFourierTransform
-  with VarianceRadius with RisingEntropy with LinearFill

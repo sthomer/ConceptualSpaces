@@ -77,7 +77,12 @@ case class Complex(re: Double = 0, im: Double = 0)
 
   val sum: Complex = this
 
-  val total: BigDecimal = BigDecimal(this.re)
+  val total: BigDecimal = try {
+    BigDecimal(this.re)
+  } catch {
+    case e: Exception => BigDecimal(0)
+  }
+//  val total = this.re
 
   val magnitude: Double = abs
 
@@ -93,22 +98,22 @@ case class Complex(re: Double = 0, im: Double = 0)
 
   def +(that: TensorLike): TensorLike = that match {
     case c: Complex => this add c
-    case t: Tensor => t + this
+    case t: Tensor => this + t
   }
 
   def -(that: TensorLike): TensorLike = that match {
     case c: Complex => this subtract c
-    case t: Tensor => t - this
+    case t: Tensor => this - t
   }
 
   def *(that: TensorLike): TensorLike = that match {
     case c: Complex => this multiply c
-    case t: Tensor => t * this
+    case t: Tensor => this * t
   }
 
   def /(that: TensorLike): TensorLike = that match {
     case c: Complex => this divide c
-    case t: Tensor => t / this
+    case t: Tensor => this / t
   }
 }
 

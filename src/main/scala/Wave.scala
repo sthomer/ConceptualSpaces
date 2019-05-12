@@ -8,7 +8,7 @@ object Wave extends App {
 
   withAudio("src/main/scala/export.wav") { input =>
     println("Transforming...")
-    val size = 256
+    val size = 64
     val timeSpace = new EuclidianSpace
     val timeConcepts = input
       .map(r => Concept(r))
@@ -39,7 +39,7 @@ object Wave extends App {
     toDat("slide", rows)
 
     println("Inverting...")
-    mem.dimensionAt(2).concepts
+    mem.dimensionAt(1).space.concepts
       .flatMap(space.inverse(_).concepts)
       .flatMap(space.inverse(_).concepts)
       .map(_.tensor)

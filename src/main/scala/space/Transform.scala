@@ -2,7 +2,7 @@ package space
 
 import Implicits._
 
-trait Transform extends InnerProduct {
+trait Transform {
   def transform(t: Trajectory): Concept
 
   def inverse(c: Concept): Trajectory

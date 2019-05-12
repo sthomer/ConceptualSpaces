@@ -1,7 +1,5 @@
 package space
 
-import Implicits._
-
 trait InnerProduct {
   def distance(a: Concept, b: Concept): BigDecimal
 

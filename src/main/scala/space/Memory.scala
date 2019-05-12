@@ -6,7 +6,6 @@ case class Node(private val id: String = UUID.randomUUID().toString.take(5),
                 var concept: Concept = Concept.empty,
                 level: Int = 0) {
 
-  var set: Set[Concept] = Set(concept)
   private var _prev: Option[Node] = None
   private var _next: Option[Node] = None
   private var _up: Option[Node] = None
@@ -57,6 +56,63 @@ object Memory {
 
 case class Memory(var root: Node = Node()) {
 
+  var dimensions: Vector[Dimension] = Vector(Dimension())
+
+  def dimensionAt(i: Int): Dimension = {
+    if (i < dimensions.length) dimensions(i)
+    else { // Dimensions are never skipped, so this works
+      dimensions = dimensions :+ Dimension()
+      dimensions(i)
+    }
+  }
+
+  var count = 0
+
+  def perceive(concept: Concept): Unit = {
+    val current = Node(concept = concept)
+    current.prev = root
+    root.next = current
+    current.prev = root
+
+    append(current)
+
+    root = current
+
+    println(count)
+    count = count + 1
+  }
+
+  def append(node: Node): Option[Node] = {
+    dimensionAt(node.level).add(node.concept) match {
+      case None => None
+      case Some(abstraction) =>
+        val superior = Node(concept = abstraction, level = node.level + 1)
+        node.prev.get.up = superior
+        subtend(node.prev, superior)
+        append(superior)
+    }
+  }
+
+  // TODO: this is connecting backwards; does it matter?
+  def subtend(node: Option[Node], superior: Node): Unit =
+    node match {
+      case None =>
+      case Some(node) => node.prev match {
+        case None => // Beginning of abstraction layer
+          superior.down = node
+        case Some(node: Node) => node.up match {
+          case None =>
+            subtend(node.prev, superior)
+          case Some(prevUp: Node) =>
+            superior.prev = Some(prevUp)
+            superior.down = node
+        }
+      }
+    }
+
+
+  // QoL Helpers
+
   def collect(node: Node): Vector[Node] = node.prev match {
     case None => Vector(node)
     case Some(prev: Node) => collect(prev) :+ node
@@ -75,55 +131,5 @@ case class Memory(var root: Node = Node()) {
     }
   }
 
-  var dimensions: Vector[Space] = Vector(new EuclidianSpace)
-
-  def dimensionAt(i: Int): Space = {
-    if (i < dimensions.length) dimensions(i)
-    else { // Dimensions are never skipped, so this works
-      dimensions = dimensions :+ new EuclidianSpace
-      dimensions(i)
-    }
-  }
-
-  def perceive(concept: Concept): Unit = {
-    val current = Node(concept = concept)
-    current.prev = root
-    root.next = current
-    current.prev = root
-
-    val space = dimensionAt(current.level)
-    space label concept
-    space attachAll space.concepts
-    segment(current)
-
-    root = current
-  }
-
-  // I think this is connecting backwards
-  def segment(node: Node): Unit = {
-    dimensionAt(node.level).segopt(node.concept) match {
-      case None =>
-      case Some(concept) =>
-        val category = Node(concept = concept, level = node.level + 1)
-        dimensionAt(category.level) label concept
-        node.prev.get.up = category
-        subtend(node.prev, category)
-    }
-  }
-
-  def subtend(node: Option[Node], category: Node): Unit =
-    node match {
-      case None =>
-      case Some(node) => node.prev match {
-        case None => // Beginning of abstraction layer
-        case Some(node: Node) => node.up match {
-          case None =>
-            subtend(node.prev, category)
-          case Some(prevUp: Node) =>
-            category.prev = Some(prevUp)
-            category.down = node
-        }
-      }
-    }
 }
 
